@@ -21,6 +21,7 @@ import (
 	gossip_proto "github.com/hyperledger/fabric/protos/gossip"
 	"github.com/hyperledger/fabric/protos/orderer"
 	"github.com/op/go-logging"
+	"github.com/spf13/viper"
 )
 
 // LedgerInfo an adapter to provide the interface to query
@@ -248,6 +249,8 @@ func createGossipMsg(chainID string, payload *gossip_proto.Payload) *gossip_prot
 		Channel: []byte(chainID),
 		Content: &gossip_proto.GossipMessage_DataMsg{
 			DataMsg: &gossip_proto.DataMessage{
+				PushTTL: int32(viper.Get("peer.gossip.blockPushTtl").(int)),
+				PullTTL: int32(viper.Get("peer.gossip.blockPullTtl").(int)),
 				Payload: payload,
 			},
 		},
