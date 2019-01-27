@@ -230,7 +230,9 @@ message DataDigest {
 
 // DataMessage is the message that contains a block
 message DataMessage {
-    Payload payload = 1;
+    int32   PushTTL = 1;
+    int32   PullTTL = 2;
+    Payload payload = 3;
 }
 
 // PrivateDataMessage message which includes private
