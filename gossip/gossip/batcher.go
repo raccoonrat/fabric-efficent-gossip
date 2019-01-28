@@ -78,8 +78,9 @@ func (p *batchingEmitterImpl) emit() {
 		msgs2beEmitted[i] = v.data
 	}
 
-	p.cb(msgs2beEmitted)
 	p.decrementCounters()
+	p.cb(msgs2beEmitted)
+	p.updateBuffer()
 }
 
 func (p *batchingEmitterImpl) decrementCounters() {
@@ -87,6 +88,13 @@ func (p *batchingEmitterImpl) decrementCounters() {
 	for i := 0; i < n; i++ {
 		msg := p.buff[i]
 		*msg.iterationsLeft--
+	}
+}
+
+func (p *batchingEmitterImpl) updateBuffer() {
+	n := len(p.buff)
+	for i := 0; i < n; i++ {
+		msg := p.buff[i]
 		if *msg.iterationsLeft == 0 {
 			p.buff = append(p.buff[:i], p.buff[i+1:]...)
 			n--
