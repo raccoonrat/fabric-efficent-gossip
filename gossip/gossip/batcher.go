@@ -21,7 +21,7 @@ type emitBatchCallback func([]interface{})
 // If the batchingEmitter's stored message count reaches a certain capacity, that also triggers a message dispatch
 type batchingEmitter interface {
 	// Add adds a message to be batched
-	Add(interface{})
+	Add(interface{}, *int32)
 
 	// Stop stops the component
 	Stop()
@@ -86,8 +86,8 @@ func (p *batchingEmitterImpl) decrementCounters() {
 	n := len(p.buff)
 	for i := 0; i < n; i++ {
 		msg := p.buff[i]
-		msg.iterationsLeft--
-		if msg.iterationsLeft == 0 {
+		*msg.iterationsLeft--
+		if *msg.iterationsLeft == 0 {
 			p.buff = append(p.buff[:i], p.buff[i+1:]...)
 			n--
 			i--
@@ -111,7 +111,7 @@ type batchingEmitterImpl struct {
 
 type batchedMessage struct {
 	data           interface{}
-	iterationsLeft int
+	iterationsLeft *int32
 }
 
 func (p *batchingEmitterImpl) Stop() {
@@ -124,14 +124,24 @@ func (p *batchingEmitterImpl) Size() int {
 	return len(p.buff)
 }
 
-func (p *batchingEmitterImpl) Add(message interface{}) {
-	if p.iterations == 0 {
+func (p *batchingEmitterImpl) Add(message interface{}, ttl *int32) {
+	var iterationsLeft *int32
+
+	if ttl == nil {
+		var iterations int32
+		iterations = int32(p.iterations)
+		iterationsLeft = &iterations
+	} else {
+		iterationsLeft = ttl
+	}
+
+	if *iterationsLeft == 0 {
 		return
 	}
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.buff = append(p.buff, &batchedMessage{data: message, iterationsLeft: p.iterations})
+	p.buff = append(p.buff, &batchedMessage{data: message, iterationsLeft: iterationsLeft})
 
 	if len(p.buff) >= p.burstSize {
 		p.emit()

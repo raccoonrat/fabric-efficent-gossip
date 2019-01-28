@@ -151,15 +151,21 @@ func (ga *gossipAdapterImpl) Gossip(msg *proto.SignedGossipMessage) {
 		filter: func(_ common.PKIidType) bool {
 			return true
 		},
-	})
+	}, nil)
 }
 
 // Forward sends message to the next hops
 func (ga *gossipAdapterImpl) Forward(msg proto.ReceivedMessage) {
+	var iterationsLeft *int32 = nil
+
+	if msg.GetGossipMessage().IsDataMsg() {
+		iterationsLeft = &msg.GetGossipMessage().GetDataMsg().PushTTL
+	}
+
 	ga.gossipServiceImpl.emitter.Add(&emittedGossipMessage{
 		SignedGossipMessage: msg.GetGossipMessage(),
 		filter:              msg.GetConnectionInfo().ID.IsNotSameFilter,
-	})
+	}, iterationsLeft)
 }
 
 func (ga *gossipAdapterImpl) Send(msg *proto.SignedGossipMessage, peers ...*comm.RemotePeer) {

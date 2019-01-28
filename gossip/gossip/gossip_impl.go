@@ -361,7 +361,7 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 					g.emitter.Add(&emittedGossipMessage{
 						SignedGossipMessage: msg,
 						filter:              m.GetConnectionInfo().ID.IsNotSameFilter,
-					})
+					}, nil)
 				}
 			}
 			if !g.toDie() {
@@ -689,6 +689,11 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 		}
 	}
 
+	var iterationsLeft *int32 = nil
+
+	if sMsg.IsDataMsg() {
+		iterationsLeft = &sMsg.GetDataMsg().PushTTL
+	}
 	if g.conf.PropagateIterations == 0 {
 		return
 	}
@@ -697,7 +702,7 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 		filter: func(_ common.PKIidType) bool {
 			return true
 		},
-	})
+	}, iterationsLeft)
 }
 
 // Send sends a message to remote peers
@@ -867,7 +872,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 				filter: func(_ common.PKIidType) bool {
 					return true
 				},
-			})
+			}, nil)
 		},
 		forwardFunc: func(message proto.ReceivedMessage) {
 			if g.conf.PropagateIterations == 0 {
@@ -876,7 +881,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 			g.emitter.Add(&emittedGossipMessage{
 				SignedGossipMessage: message.GetGossipMessage(),
 				filter:              message.GetConnectionInfo().ID.IsNotSameFilter,
-			})
+			}, nil)
 		},
 		incChan:          make(chan proto.ReceivedMessage),
 		presumedDead:     g.presumedDead,
