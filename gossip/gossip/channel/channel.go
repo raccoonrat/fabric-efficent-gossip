@@ -565,6 +565,9 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 				gc.logger.Warning("Failed verifying block", m.GetDataMsg().Payload.SeqNum)
 				return
 			}
+			m.Signer = func(msg []byte) ([]byte, error) {
+				return nil, nil
+			}
 			added = gc.blockMsgStore.Add(msg.GetGossipMessage())
 		} else { // StateInfoMsg verification should be handled in a layer above
 			//  since we don't have access to the id mapper here

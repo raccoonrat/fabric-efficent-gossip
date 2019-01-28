@@ -667,6 +667,9 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 	var err error
 	if sMsg.IsDataMsg() {
 		sMsg, err = sMsg.NoopSign()
+		sMsg.Signer = func(msg []byte) ([]byte, error) {
+			return nil, nil
+		}
 	} else {
 		_, err = sMsg.Sign(func(msg []byte) ([]byte, error) {
 			return g.mcs.Sign(msg)
