@@ -257,6 +257,9 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 		return
 	}
 
+	if msg.Signer != nil {
+		msg.Sign(msg.Signer)
+	}
 	m := &msgSending{
 		envelope: msg.Envelope,
 		onErr:    onErr,

@@ -488,6 +488,7 @@ func (s *SecretEnvelope) InternalEndpoint() string {
 type SignedGossipMessage struct {
 	*Envelope
 	*GossipMessage
+	Signer Signer
 }
 
 func (p *Payload) toString() string {
