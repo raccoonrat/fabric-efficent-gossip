@@ -459,7 +459,7 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 			data = msgs2Gossip[i].GetAliveMsg().Identity
 			msgs2Gossip[i].GetAliveMsg().Identity = nil
 		}
-		g.logger.Critical("Sending ", msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL, msgs2Gossip[i])
+		g.logger.Critical("Sending ", msgs2Gossip[i])
 		if msgs2Gossip[i].IsDataMsg() {
 			msgs2Gossip[i].GetDataMsg().Payload.Data = data
 		}
