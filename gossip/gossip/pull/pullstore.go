@@ -185,6 +185,7 @@ func (p *pullMediatorImpl) HandleMessage(m proto.ReceivedMessage) {
 	}
 	if res := msg.GetDataUpdate(); res != nil {
 		itemIDs = make([]string, len(res.Data))
+		itemBatchs := make([]algo.BatchedMessage, len(res.Data))
 		items = make([]*proto.SignedGossipMessage, len(res.Data))
 		pullMsgType = ResponseMsgType
 		for i, pulledMsg := range res.Data {
@@ -195,12 +196,17 @@ func (p *pullMediatorImpl) HandleMessage(m proto.ReceivedMessage) {
 			}
 			p.MsgCons(msg)
 			itemIDs[i] = p.IdExtractor(msg)
+			itemBatchs[i].Data = itemIDs[i]
+			itemBatchs[i].IterationsLeft = nil
+			if msg.IsDataMsg() {
+				itemBatchs[i].IterationsLeft = &msg.GetDataMsg().PullTTL
+			}
 			items[i] = msg
 			p.Lock()
 			p.itemID2Msg[itemIDs[i]] = msg
 			p.Unlock()
 		}
-		p.engine.OnRes(itemIDs, res.Nonce)
+		p.engine.OnRes(itemBatchs, res.Nonce)
 	}
 
 	// Invoke hooks for relevant message type
@@ -224,10 +230,14 @@ func (p *pullMediatorImpl) RegisterMsgHook(pullMsgType MsgType, hook MessageHook
 // Add adds a GossipMessage to the store
 func (p *pullMediatorImpl) Add(msg *proto.SignedGossipMessage) {
 	p.Lock()
+	var iterationsLeft *int32 = nil
+	if msg.IsDataMsg() {
+		iterationsLeft = &msg.GetDataMsg().PullTTL
+	}
 	defer p.Unlock()
 	itemID := p.IdExtractor(msg)
 	p.itemID2Msg[itemID] = msg
-	p.engine.Add(itemID)
+	p.engine.Add(algo.BatchedMessage{Data: itemID, IterationsLeft: iterationsLeft})
 }
 
 // Remove removes a GossipMessage from the Mediator with a matching digest,
@@ -330,6 +340,9 @@ func (p *pullMediatorImpl) SendRes(items []string, context interface{}, nonce ui
 	defer p.RUnlock()
 	for _, item := range items {
 		if msg, exists := p.itemID2Msg[item]; exists {
+			if msg.Signer != nil {
+				msg.Sign(msg.Signer)
+			}
 			items2return = append(items2return, msg.Envelope)
 		}
 	}

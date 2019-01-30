@@ -84,11 +84,17 @@ type PullAdapter interface {
 	SendRes(items []string, context interface{}, nonce uint64)
 }
 
+type BatchedMessage struct {
+	Data           interface{}
+	IterationsLeft *int32
+}
+
 // PullEngine is the component that actually invokes the pull algorithm
 // with the help of the PullAdapter
 type PullEngine struct {
 	PullAdapter
 	stopFlag           int32
+	buff               []*BatchedMessage
 	state              *util.Set
 	item2owners        map[string][]string
 	peers2nonces       map[string]uint64
@@ -175,6 +181,7 @@ func (engine *PullEngine) initiatePull() {
 	engine.lock.Lock()
 	defer engine.lock.Unlock()
 
+	engine.decrementCounters()
 	engine.acceptDigests()
 	for _, peer := range engine.SelectPeers() {
 		nonce := engine.newNONCE()
@@ -188,6 +195,28 @@ func (engine *PullEngine) initiatePull() {
 	time.AfterFunc(digestWaitTime, func() {
 		engine.processIncomingDigests()
 	})
+}
+
+func (engine *PullEngine) decrementCounters() {
+	n := len(engine.buff)
+	for i := 0; i < n; i++ {
+		msg := engine.buff[i]
+		if msg.IterationsLeft != nil {
+			*msg.IterationsLeft--
+		}
+	}
+}
+
+func (engine *PullEngine) updateBuffer() {
+	n := len(engine.buff)
+	for i := 0; i < n; i++ {
+		msg := engine.buff[i]
+		if msg.IterationsLeft != nil && *msg.IterationsLeft == 0 {
+			engine.buff = append(engine.buff[:i], engine.buff[i+1:]...)
+			n--
+			i--
+		}
+	}
 }
 
 func (engine *PullEngine) processIncomingDigests() {
@@ -228,6 +257,8 @@ func (engine *PullEngine) endPull() {
 	engine.item2owners = make(map[string][]string)
 	engine.peers2nonces = make(map[string]uint64)
 	engine.nonces2peers = make(map[uint64]string)
+
+	engine.updateBuffer()
 }
 
 // OnDigest notifies the engine that a digest has arrived
@@ -253,16 +284,30 @@ func (engine *PullEngine) OnDigest(digest []string, nonce uint64, context interf
 }
 
 // Add adds items to the state
-func (engine *PullEngine) Add(seqs ...string) {
+func (engine *PullEngine) Add(seqs ...BatchedMessage) {
 	for _, seq := range seqs {
-		engine.state.Add(seq)
+		if !engine.state.Exists(seq.Data.(string)) {
+			engine.state.Add(seq)
+			engine.buff = append(engine.buff, &seq)
+		}
 	}
 }
 
 // Remove removes items from the state
 func (engine *PullEngine) Remove(seqs ...string) {
+	seqsSet := util.NewSet()
 	for _, seq := range seqs {
 		engine.state.Remove(seq)
+		seqsSet.Add(seq)
+	}
+	n := len(engine.buff)
+	for i := 0; i < n; i++ {
+		msg := engine.buff[i]
+		if seqsSet.Exists(msg.Data.(string)) {
+			engine.buff = append(engine.buff[:i], engine.buff[i+1:]...)
+			n--
+			i--
+		}
 	}
 }
 
@@ -275,11 +320,10 @@ func (engine *PullEngine) OnHello(nonce uint64, context interface{}) {
 		engine.incomingNONCES.Remove(nonce)
 	})
 
-	a := engine.state.ToArray()
 	var digest []string
 	filter := engine.digFilter(context)
-	for _, item := range a {
-		dig := item.(string)
+	for _, item := range engine.buff {
+		dig := item.Data.(string)
 		if !filter(dig) {
 			continue
 		}
@@ -315,7 +359,7 @@ func (engine *PullEngine) OnReq(items []string, nonce uint64, context interface{
 }
 
 // OnRes notifies the engine a response has arrived
-func (engine *PullEngine) OnRes(items []string, nonce uint64) {
+func (engine *PullEngine) OnRes(items []BatchedMessage, nonce uint64) {
 	if !engine.outgoingNONCES.Exists(nonce) || !engine.isAcceptingResponses() {
 		return
 	}
