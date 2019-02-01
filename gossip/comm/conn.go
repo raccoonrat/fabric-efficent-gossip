@@ -268,7 +268,7 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 		for _, data := range msg.GetDataUpdate().Data {
 			gossipMsg, err := data.ToGossipMessage()
 			if err != nil && gossipMsg.IsDataMsg() {
-				conn.logger.Criticalf("Pulling block #%d to %s", gossipMsg.GetDataMsg().Payload.SeqNum, conn.pkiID)
+				conn.logger.Criticalf("%s pulling block #%d", conn.pkiID, gossipMsg.GetDataMsg().Payload.SeqNum)
 			}
 		}
 	}
