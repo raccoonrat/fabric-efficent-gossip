@@ -260,6 +260,19 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 	if msg.Signer != nil {
 		msg.Sign(msg.Signer)
 	}
+
+	if msg.IsDataMsg() {
+		conn.logger.Criticalf("Pushing block #%d to %s", msg.GetDataMsg().Payload.SeqNum, conn.pkiID)
+	}
+	if msg.IsDataUpdate() {
+		for _, data := range msg.GetDataUpdate().Data {
+			gossipMsg, err := data.ToGossipMessage()
+			if err != nil && gossipMsg.IsDataMsg() {
+				conn.logger.Criticalf("Pulling block #%d to %s", gossipMsg.GetDataMsg().Payload.SeqNum, conn.pkiID)
+			}
+		}
+	}
+
 	m := &msgSending{
 		envelope: msg.Envelope,
 		onErr:    onErr,

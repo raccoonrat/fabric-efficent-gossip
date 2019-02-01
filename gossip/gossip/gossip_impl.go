@@ -334,7 +334,6 @@ func (g *gossipServiceImpl) acceptMessages(incMsgs <-chan proto.ReceivedMessage)
 }
 
 func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
-	var data []byte
 	if g.toDie() {
 		return
 	}
@@ -344,22 +343,7 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	}
 
 	msg := m.GetGossipMessage()
-
-	if msg.IsDataMsg() {
-		data = msg.GetDataMsg().Payload.Data
-		msg.GetDataMsg().Payload.Data = nil
-	}
-	if msg.IsAliveMsg() {
-		data = msg.GetAliveMsg().Identity
-		msg.GetAliveMsg().Identity = nil
-	}
-	g.logger.Critical("Entering,", m.GetConnectionInfo(), "sent us", msg.Content)
-	if msg.IsDataMsg() {
-		msg.GetDataMsg().Payload.Data = data
-	}
-	if msg.IsAliveMsg() {
-		msg.GetAliveMsg().Identity = data
-	}
+	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg.Content)
 	defer g.logger.Debug("Exiting")
 
 	if !g.validateMsg(m) {
@@ -446,26 +430,9 @@ func (g *gossipServiceImpl) validateMsg(msg proto.ReceivedMessage) bool {
 }
 
 func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
-	var data []byte
-
 	msgs2Gossip := make([]*emittedGossipMessage, len(a))
 	for i, e := range a {
 		msgs2Gossip[i] = e.(*emittedGossipMessage)
-		if msgs2Gossip[i].IsDataMsg() {
-			data = msgs2Gossip[i].GetDataMsg().Payload.Data
-			msgs2Gossip[i].GetDataMsg().Payload.Data = nil
-		}
-		if msgs2Gossip[i].IsAliveMsg() {
-			data = msgs2Gossip[i].GetAliveMsg().Identity
-			msgs2Gossip[i].GetAliveMsg().Identity = nil
-		}
-		g.logger.Critical("Sending ", msgs2Gossip[i].Content)
-		if msgs2Gossip[i].IsDataMsg() {
-			msgs2Gossip[i].GetDataMsg().Payload.Data = data
-		}
-		if msgs2Gossip[i].IsAliveMsg() {
-			msgs2Gossip[i].GetAliveMsg().Identity = data
-		}
 	}
 	g.gossipBatch(msgs2Gossip)
 }
