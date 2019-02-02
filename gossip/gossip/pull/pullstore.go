@@ -360,6 +360,9 @@ func (p *pullMediatorImpl) SendRes(items []string, context interface{}, nonce ui
 	}
 	remotePeer := context.(proto.ReceivedMessage).GetConnectionInfo()
 	p.logger.Debug("Sending", len(returnedUpdate.GetDataUpdate().Data), p.config.MsgType, "items to", remotePeer)
+	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
+		p.logger.Critical("Sending pull response", len(returnedUpdate.GetDataUpdate().Data), p.config.MsgType, "items to", remotePeer)
+	}
 	context.(proto.ReceivedMessage).Respond(returnedUpdate)
 }
 
