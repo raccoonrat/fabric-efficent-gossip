@@ -650,6 +650,7 @@ func (s *GossipStateProviderImpl) requestBlocksInRange(start uint64, end uint64)
 				"for chainID %s", peer.Endpoint, prev, next, s.chainID)
 
 			s.mediator.Send(gossipMsg, peer)
+			logger.Criticalf("Requesting blocks #%d->#%d from %v", gossipMsg.GetStateRequest().StartSeqNum, gossipMsg.GetStateRequest().EndSeqNum, peer.PKIID)
 			tryCounts++
 
 			// Wait until timeout or response arrival
@@ -658,6 +659,7 @@ func (s *GossipStateProviderImpl) requestBlocksInRange(start uint64, end uint64)
 				if msg.GetGossipMessage().Nonce != gossipMsg.Nonce {
 					continue
 				}
+				logger.Criticalf("Recieved %d blocks from %v", len(msg.GetGossipMessage().GetStateResponse().Payloads), msg.GetConnectionInfo().ID)
 				// Got corresponding response for state request, can continue
 				index, err := s.handleStateResponse(msg)
 				if err != nil {
