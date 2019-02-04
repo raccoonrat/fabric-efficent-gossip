@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"fmt"
 	"github.com/hyperledger/fabric/gossip/util"
 	proto "github.com/hyperledger/fabric/protos/gossip"
 	"github.com/op/go-logging"
@@ -219,6 +220,7 @@ func (engine *PullEngine) updateBuffer() {
 		msg := engine.buff[i]
 		if msg.IterationsLeft != nil && *msg.IterationsLeft == 0 {
 			engine.buff = append(engine.buff[:i], engine.buff[i+1:]...)
+			engine.state.Remove(msg.Data.(string))
 			n--
 			i--
 		}
@@ -354,15 +356,17 @@ func (engine *PullEngine) OnReq(items []string, nonce uint64, context interface{
 
 	filter := engine.digFilter(context)
 	var items2Send []string
+	var logString string
 	for _, item := range items {
 		if engine.state.Exists(item) && filter(item) {
+			logString = fmt.Sprintf("[%s %t %t] %s", item, engine.state.Exists(item), filter(item), logString)
 			items2Send = append(items2Send, item)
 		}
 	}
 
 	if len(items2Send) == 0 {
 		if engine.MsgType == proto.PullMsgType_BLOCK_MSG {
-			engine.logger.Criticalf("[NOT] Responding PullEngine:OnReq %v %v", engine.state, items)
+			engine.logger.Criticalf("[NOT] Responding PullEngine:OnReq %v %v", engine.state, logString)
 		}
 		return
 	}
