@@ -362,7 +362,7 @@ func (engine *PullEngine) OnReq(items []string, nonce uint64, context interface{
 
 	if len(items2Send) == 0 {
 		if engine.MsgType == proto.PullMsgType_BLOCK_MSG {
-			engine.logger.Criticalf("[NOT] Responding PullEngine:OnReq")
+			engine.logger.Criticalf("[NOT] Responding PullEngine:OnReq %v %v", engine.state, items)
 		}
 		return
 	}
