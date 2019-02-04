@@ -140,7 +140,7 @@ func NewPullMediator(config Config, adapter *PullAdapter) Mediator {
 		itemID2Msg:   make(map[string]*proto.SignedGossipMessage),
 	}
 
-	p.engine = algo.NewPullEngineWithFilter(p, config.PullInterval, egressDigFilter.byContext())
+	p.engine = algo.NewPullEngineWithFilter(p, config.PullInterval, egressDigFilter.byContext(), config.ID)
 
 	if adapter.IngressDigFilter == nil {
 		// Create accept all filter
@@ -301,7 +301,7 @@ func (p *pullMediatorImpl) SendDigest(digest []string, nonce uint64, context int
 	}
 	remotePeer := context.(proto.ReceivedMessage).GetConnectionInfo()
 	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
-		p.logger.Criticalf("Sending PullMsg Digest %v from %v", digMsg.GetDataDig().Digests, remotePeer.ID)
+		p.logger.Criticalf("Sending PullMsg Digest %v to %v", digMsg.GetDataDig().Digests, remotePeer.ID)
 	}
 	if p.logger.IsEnabledFor(logging.DEBUG) {
 		p.logger.Debug("Sending", p.config.MsgType, "digest:", digMsg.GetDataDig().FormattedDigests(), "to", remotePeer)
@@ -363,7 +363,7 @@ func (p *pullMediatorImpl) SendRes(items []string, context interface{}, nonce ui
 	}
 	remotePeer := context.(proto.ReceivedMessage).GetConnectionInfo()
 	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
-		p.logger.Criticalf("Sending PullMsg Digest %v from %v", items, remotePeer.ID)
+		p.logger.Criticalf("Sending PullMsg Response %v to %v", items, remotePeer.ID)
 	}
 	p.logger.Debug("Sending", len(returnedUpdate.GetDataUpdate().Data), p.config.MsgType, "items to", remotePeer)
 	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {

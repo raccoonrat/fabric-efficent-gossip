@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric/gossip/util"
+	"github.com/op/go-logging"
 	"github.com/spf13/viper"
 )
 
@@ -105,11 +106,12 @@ type PullEngine struct {
 	outgoingNONCES     *util.Set
 	incomingNONCES     *util.Set
 	digFilter          DigestFilter
+	logger             *logging.Logger
 }
 
 // NewPullEngineWithFilter creates an instance of a PullEngine with a certain sleep time
 // between pull initiations, and uses the given filters when sending digests and responses
-func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, df DigestFilter) *PullEngine {
+func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, df DigestFilter, ID string) *PullEngine {
 	engine := &PullEngine{
 		PullAdapter:        participant,
 		stopFlag:           int32(0),
@@ -122,6 +124,7 @@ func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, d
 		incomingNONCES:     util.NewSet(),
 		outgoingNONCES:     util.NewSet(),
 		digFilter:          df,
+		logger:             util.GetLogger(util.LoggingPullModule, ID),
 	}
 
 	go func() {
@@ -145,7 +148,7 @@ func NewPullEngine(participant PullAdapter, sleepTime time.Duration) *PullEngine
 			return true
 		}
 	}
-	return NewPullEngineWithFilter(participant, sleepTime, acceptAllFilter)
+	return NewPullEngineWithFilter(participant, sleepTime, acceptAllFilter, "")
 }
 
 func (engine *PullEngine) toDie() bool {
