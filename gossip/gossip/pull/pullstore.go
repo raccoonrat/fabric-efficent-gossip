@@ -140,7 +140,7 @@ func NewPullMediator(config Config, adapter *PullAdapter) Mediator {
 		itemID2Msg:   make(map[string]*proto.SignedGossipMessage),
 	}
 
-	p.engine = algo.NewPullEngineWithFilter(p, config.PullInterval, egressDigFilter.byContext(), config.ID)
+	p.engine = algo.NewPullEngineWithFilter(p, config.PullInterval, egressDigFilter.byContext(), config.ID, p.config.MsgType)
 
 	if adapter.IngressDigFilter == nil {
 		// Create accept all filter

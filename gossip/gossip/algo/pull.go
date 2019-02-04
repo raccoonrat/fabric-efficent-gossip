@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric/gossip/util"
+	proto "github.com/hyperledger/fabric/protos/gossip"
 	"github.com/op/go-logging"
 	"github.com/spf13/viper"
 )
@@ -107,11 +108,12 @@ type PullEngine struct {
 	incomingNONCES     *util.Set
 	digFilter          DigestFilter
 	logger             *logging.Logger
+	MsgType            proto.PullMsgType
 }
 
 // NewPullEngineWithFilter creates an instance of a PullEngine with a certain sleep time
 // between pull initiations, and uses the given filters when sending digests and responses
-func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, df DigestFilter, ID string) *PullEngine {
+func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, df DigestFilter, ID string, MsgType proto.PullMsgType) *PullEngine {
 	engine := &PullEngine{
 		PullAdapter:        participant,
 		stopFlag:           int32(0),
@@ -125,6 +127,7 @@ func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, d
 		outgoingNONCES:     util.NewSet(),
 		digFilter:          df,
 		logger:             util.GetLogger(util.LoggingPullModule, ID),
+		MsgType:            MsgType,
 	}
 
 	go func() {
@@ -148,7 +151,7 @@ func NewPullEngine(participant PullAdapter, sleepTime time.Duration) *PullEngine
 			return true
 		}
 	}
-	return NewPullEngineWithFilter(participant, sleepTime, acceptAllFilter, "")
+	return NewPullEngineWithFilter(participant, sleepTime, acceptAllFilter, "", 0)
 }
 
 func (engine *PullEngine) toDie() bool {
@@ -344,6 +347,9 @@ func (engine *PullEngine) OnReq(items []string, nonce uint64, context interface{
 		return
 	}
 	engine.lock.Lock()
+	if engine.MsgType == proto.PullMsgType_BLOCK_MSG {
+		engine.logger.Criticalf("Entering PullEngine:OnReq")
+	}
 	defer engine.lock.Unlock()
 
 	filter := engine.digFilter(context)
@@ -355,7 +361,14 @@ func (engine *PullEngine) OnReq(items []string, nonce uint64, context interface{
 	}
 
 	if len(items2Send) == 0 {
+		if engine.MsgType == proto.PullMsgType_BLOCK_MSG {
+			engine.logger.Criticalf("[NOT] Responding PullEngine:OnReq")
+		}
 		return
+	}
+
+	if engine.MsgType == proto.PullMsgType_BLOCK_MSG {
+		engine.logger.Criticalf("Responding PullEngine:OnReq")
 	}
 
 	go engine.SendRes(items2Send, context, nonce)
