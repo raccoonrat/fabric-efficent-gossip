@@ -358,7 +358,13 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 			g.logger.Criticalf("Received PullMsg Request %v from %v", msg.GetDataReq().Digests, m.GetConnectionInfo().ID)
 		}
 		if msg.IsDataUpdate() {
-			g.logger.Criticalf("Received PullMsg Update from %v", m.GetConnectionInfo().ID)
+			var seqs []uint64
+			seqs = make([]uint64, len(msg.GetDataUpdate().Data))
+			for i, pulledMsg := range msg.GetDataUpdate().Data {
+				dataMsg, _ := pulledMsg.ToGossipMessage()
+				seqs[i] = dataMsg.GetDataMsg().Payload.SeqNum
+			}
+			g.logger.Criticalf("Received PullMsg Update %v from %v", seqs, m.GetConnectionInfo().ID)
 		}
 	}
 	defer g.logger.Debug("Exiting")
