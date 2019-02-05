@@ -295,7 +295,7 @@ func (engine *PullEngine) OnDigest(digest []string, nonce uint64, context interf
 func (engine *PullEngine) Add(seqs ...BatchedMessage) {
 	for _, seq := range seqs {
 		if !engine.state.Exists(seq.Data.(string)) {
-			engine.state.Add(seq)
+			engine.state.Add(seq.Data.(string))
 			engine.buff = append(engine.buff, &seq)
 		}
 	}
