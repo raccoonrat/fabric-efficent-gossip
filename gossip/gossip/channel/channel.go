@@ -395,6 +395,7 @@ func (gc *gossipChannel) createBlockPuller() pull.Mediator {
 		MemSvc:      gc.memFilter,
 		IdExtractor: seqNumFromMsg,
 		MsgCons: func(msg *proto.SignedGossipMessage) {
+			gc.logger.Criticalf("Consume %d", msg.GetDataMsg().Payload.SeqNum)
 			gc.DeMultiplex(msg)
 		},
 	}
