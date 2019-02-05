@@ -251,7 +251,7 @@ func (s *GossipStateProviderImpl) listen() {
 	for {
 		select {
 		case msg := <-s.gossipChan:
-			logger.Debug("Received new message via gossip channel")
+			logger.Criticalf("Received new message via gossip channel %d", msg.GetDataMsg().Payload.SeqNum)
 			go s.queueNewMessage(msg)
 		case msg := <-s.commChan:
 			logger.Debug("Dispatching a message", msg)
