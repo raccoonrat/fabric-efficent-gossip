@@ -270,7 +270,7 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 			if err != nil && gossipMsg.IsDataMsg() {
 				conn.logger.Criticalf("%v pulling block #%d push_ttl:%d pull_ttl:%d", conn.pkiID, gossipMsg.GetDataMsg().Payload.SeqNum, gossipMsg.GetDataMsg().PushTTL, gossipMsg.GetDataMsg().PullTTL)
 			} else {
-				conn.logger.Criticalf("[ERROR] %t %v", gossipMsg.IsDataMsg, err)
+				conn.logger.Criticalf("[ERROR] %t %v", gossipMsg.IsDataMsg(), err)
 			}
 		}
 	}
