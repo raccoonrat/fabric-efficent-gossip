@@ -241,7 +241,11 @@ func (p *pullMediatorImpl) Add(msg *proto.SignedGossipMessage) {
 		p.logger.Criticalf("Adding %s", itemID)
 	}
 	p.engine.Add(algo.BatchedMessage{Data: itemID, IterationsLeft: iterationsLeft})
-	p.logger.Criticalf("Added %s: %v %v", itemID, p.engine.Buff, p.engine.State)
+	ids := make([]string, len(p.engine.Buff))
+	for i, value := range p.engine.Buff {
+		ids[i] = value.Data.(string)
+	}
+	p.logger.Criticalf("Added %s: %v %v", itemID, ids, p.engine.State)
 }
 
 // Remove removes a GossipMessage from the Mediator with a matching digest,
