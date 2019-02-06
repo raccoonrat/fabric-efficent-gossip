@@ -94,8 +94,8 @@ type BatchedMessage struct {
 type PullEngine struct {
 	PullAdapter
 	stopFlag           int32
-	buff               []*BatchedMessage
-	state              *util.Set
+	Buff               []*BatchedMessage
+	State              *util.Set
 	item2owners        map[string][]string
 	peers2nonces       map[string]uint64
 	nonces2peers       map[uint64]string
@@ -113,7 +113,7 @@ func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, d
 	engine := &PullEngine{
 		PullAdapter:        participant,
 		stopFlag:           int32(0),
-		state:              util.NewSet(),
+		State:              util.NewSet(),
 		item2owners:        make(map[string][]string),
 		peers2nonces:       make(map[string]uint64),
 		nonces2peers:       make(map[uint64]string),
@@ -198,9 +198,9 @@ func (engine *PullEngine) initiatePull() {
 }
 
 func (engine *PullEngine) decrementCounters() {
-	n := len(engine.buff)
+	n := len(engine.Buff)
 	for i := 0; i < n; i++ {
-		msg := engine.buff[i]
+		msg := engine.Buff[i]
 		if msg.IterationsLeft != nil {
 			*msg.IterationsLeft--
 		}
@@ -208,12 +208,12 @@ func (engine *PullEngine) decrementCounters() {
 }
 
 func (engine *PullEngine) updateBuffer() {
-	n := len(engine.buff)
+	n := len(engine.Buff)
 	for i := 0; i < n; i++ {
-		msg := engine.buff[i]
+		msg := engine.Buff[i]
 		if msg.IterationsLeft != nil && *msg.IterationsLeft == 0 {
-			engine.buff = append(engine.buff[:i], engine.buff[i+1:]...)
-			engine.state.Remove(msg.Data.(string))
+			engine.Buff = append(engine.Buff[:i], engine.Buff[i+1:]...)
+			engine.State.Remove(msg.Data.(string))
 			n--
 			i--
 		}
@@ -272,7 +272,7 @@ func (engine *PullEngine) OnDigest(digest []string, nonce uint64, context interf
 	defer engine.lock.Unlock()
 
 	for _, n := range digest {
-		if engine.state.Exists(n) {
+		if engine.State.Exists(n) {
 			continue
 		}
 
@@ -287,9 +287,9 @@ func (engine *PullEngine) OnDigest(digest []string, nonce uint64, context interf
 // Add adds items to the state
 func (engine *PullEngine) Add(seqs ...BatchedMessage) {
 	for _, seq := range seqs {
-		if !engine.state.Exists(seq.Data.(string)) {
-			engine.state.Add(seq.Data.(string))
-			engine.buff = append(engine.buff, &seq)
+		if !engine.State.Exists(seq.Data.(string)) {
+			engine.State.Add(seq.Data.(string))
+			engine.Buff = append(engine.Buff, &seq)
 		}
 	}
 }
@@ -298,14 +298,14 @@ func (engine *PullEngine) Add(seqs ...BatchedMessage) {
 func (engine *PullEngine) Remove(seqs ...string) {
 	seqsSet := util.NewSet()
 	for _, seq := range seqs {
-		engine.state.Remove(seq)
+		engine.State.Remove(seq)
 		seqsSet.Add(seq)
 	}
-	n := len(engine.buff)
+	n := len(engine.Buff)
 	for i := 0; i < n; i++ {
-		msg := engine.buff[i]
+		msg := engine.Buff[i]
 		if seqsSet.Exists(msg.Data.(string)) {
-			engine.buff = append(engine.buff[:i], engine.buff[i+1:]...)
+			engine.Buff = append(engine.Buff[:i], engine.Buff[i+1:]...)
 			n--
 			i--
 		}
@@ -323,7 +323,7 @@ func (engine *PullEngine) OnHello(nonce uint64, context interface{}) {
 
 	var digest []string
 	filter := engine.digFilter(context)
-	for _, item := range engine.buff {
+	for _, item := range engine.Buff {
 		dig := item.Data.(string)
 		if !filter(dig) {
 			continue
@@ -347,7 +347,7 @@ func (engine *PullEngine) OnReq(items []string, nonce uint64, context interface{
 	filter := engine.digFilter(context)
 	var items2Send []string
 	for _, item := range items {
-		if engine.state.Exists(item) && filter(item) {
+		if engine.State.Exists(item) && filter(item) {
 			items2Send = append(items2Send, item)
 		}
 	}

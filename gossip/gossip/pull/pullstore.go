@@ -237,7 +237,11 @@ func (p *pullMediatorImpl) Add(msg *proto.SignedGossipMessage) {
 	defer p.Unlock()
 	itemID := p.IdExtractor(msg)
 	p.itemID2Msg[itemID] = msg
+	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
+		p.logger.Criticalf("Adding %s", itemID)
+	}
 	p.engine.Add(algo.BatchedMessage{Data: itemID, IterationsLeft: iterationsLeft})
+	p.logger.Criticalf("Added %s: %v %v", itemID, p.engine.Buff, p.engine.State)
 }
 
 // Remove removes a GossipMessage from the Mediator with a matching digest,
