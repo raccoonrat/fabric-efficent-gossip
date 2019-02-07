@@ -300,9 +300,6 @@ func (p *pullMediatorImpl) SendDigest(digest []string, nonce uint64, context int
 		},
 	}
 	remotePeer := context.(proto.ReceivedMessage).GetConnectionInfo()
-	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
-		p.logger.Criticalf("Sending PullMsg Digest %v to %v", digMsg.GetDataDig().Digests, remotePeer.ID)
-	}
 	if p.logger.IsEnabledFor(logging.DEBUG) {
 		p.logger.Debug("Sending", p.config.MsgType, "digest:", digMsg.GetDataDig().FormattedDigests(), "to", remotePeer)
 	}
@@ -362,13 +359,7 @@ func (p *pullMediatorImpl) SendRes(items []string, context interface{}, nonce ui
 		},
 	}
 	remotePeer := context.(proto.ReceivedMessage).GetConnectionInfo()
-	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
-		p.logger.Criticalf("Sending PullMsg Response %v to %v", items, remotePeer.ID)
-	}
 	p.logger.Debug("Sending", len(returnedUpdate.GetDataUpdate().Data), p.config.MsgType, "items to", remotePeer)
-	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
-		p.logger.Critical("Sending pull response", len(returnedUpdate.GetDataUpdate().Data), p.config.MsgType, "items to", remotePeer)
-	}
 	context.(proto.ReceivedMessage).Respond(returnedUpdate)
 }
 
