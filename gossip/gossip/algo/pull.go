@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric/gossip/util"
+	proto "github.com/hyperledger/fabric/protos/gossip"
+	"github.com/op/go-logging"
 	"github.com/spf13/viper"
 )
 
@@ -105,11 +107,13 @@ type PullEngine struct {
 	outgoingNONCES     *util.Set
 	incomingNONCES     *util.Set
 	digFilter          DigestFilter
+	logger             *logging.Logger
+	msgType            proto.PullMsgType
 }
 
 // NewPullEngineWithFilter creates an instance of a PullEngine with a certain sleep time
 // between pull initiations, and uses the given filters when sending digests and responses
-func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, df DigestFilter) *PullEngine {
+func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, df DigestFilter, logger *logging.Logger, msgType proto.PullMsgType) *PullEngine {
 	engine := &PullEngine{
 		PullAdapter:        participant,
 		stopFlag:           int32(0),
@@ -122,6 +126,8 @@ func NewPullEngineWithFilter(participant PullAdapter, sleepTime time.Duration, d
 		incomingNONCES:     util.NewSet(),
 		outgoingNONCES:     util.NewSet(),
 		digFilter:          df,
+		logger:             logger,
+		msgType:            msgType,
 	}
 
 	go func() {
@@ -145,7 +151,7 @@ func NewPullEngine(participant PullAdapter, sleepTime time.Duration) *PullEngine
 			return true
 		}
 	}
-	return NewPullEngineWithFilter(participant, sleepTime, acceptAllFilter)
+	return NewPullEngineWithFilter(participant, sleepTime, acceptAllFilter, nil, proto.PullMsgType_BLOCK_MSG)
 }
 
 func (engine *PullEngine) toDie() bool {
@@ -287,10 +293,18 @@ func (engine *PullEngine) OnDigest(digest []string, nonce uint64, context interf
 // Add adds items to the state
 func (engine *PullEngine) Add(seqs ...BatchedMessage) {
 	for _, seq := range seqs {
+		if engine.msgType == proto.PullMsgType_BLOCK_MSG {
+			engine.logger.Criticalf("Adding %s", seq.Data.(string))
+		}
 		if !engine.State.Exists(seq.Data.(string)) {
 			engine.State.Add(seq.Data.(string))
 			engine.Buff = append(engine.Buff, &seq)
 		}
+		ids := make([]string, len(engine.Buff))
+		for i, value := range engine.Buff {
+			ids[i] = value.Data.(string)
+		}
+		engine.logger.Criticalf("Added %s: %v %v", seq.Data.(string), ids, engine.State)
 	}
 }
 

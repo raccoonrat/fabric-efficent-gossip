@@ -140,7 +140,7 @@ func NewPullMediator(config Config, adapter *PullAdapter) Mediator {
 		itemID2Msg:   make(map[string]*proto.SignedGossipMessage),
 	}
 
-	p.engine = algo.NewPullEngineWithFilter(p, config.PullInterval, egressDigFilter.byContext())
+	p.engine = algo.NewPullEngineWithFilter(p, config.PullInterval, egressDigFilter.byContext(), p.logger, config.MsgType)
 
 	if adapter.IngressDigFilter == nil {
 		// Create accept all filter
@@ -237,15 +237,7 @@ func (p *pullMediatorImpl) Add(msg *proto.SignedGossipMessage) {
 	defer p.Unlock()
 	itemID := p.IdExtractor(msg)
 	p.itemID2Msg[itemID] = msg
-	if p.config.MsgType == proto.PullMsgType_BLOCK_MSG {
-		p.logger.Criticalf("Adding %s", itemID)
-	}
 	p.engine.Add(algo.BatchedMessage{Data: itemID, IterationsLeft: iterationsLeft})
-	ids := make([]string, len(p.engine.Buff))
-	for i, value := range p.engine.Buff {
-		ids[i] = value.Data.(string)
-	}
-	p.logger.Criticalf("Added %s: %v %v", itemID, ids, p.engine.State)
 }
 
 // Remove removes a GossipMessage from the Mediator with a matching digest,
