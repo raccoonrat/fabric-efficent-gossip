@@ -188,8 +188,7 @@ func (p *pullMediatorImpl) HandleMessage(m proto.ReceivedMessage) {
 		itemBatchs := make([]algo.BatchedMessage, len(res.Data))
 		items = make([]*proto.SignedGossipMessage, len(res.Data))
 		pullMsgType = ResponseMsgType
-		for i := 0; i < len(res.Data); i++ {
-			pulledMsg := res.Data[i]
+		for i, pulledMsg := range res.Data {
 			msg, err := pulledMsg.ToGossipMessage()
 			if err != nil {
 				p.logger.Warningf("Data update contains an invalid message: %+v", errors.WithStack(err))

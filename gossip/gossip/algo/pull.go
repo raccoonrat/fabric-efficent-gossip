@@ -292,7 +292,8 @@ func (engine *PullEngine) OnDigest(digest []string, nonce uint64, context interf
 
 // Add adds items to the state
 func (engine *PullEngine) Add(seqs ...BatchedMessage) {
-	for _, seq := range seqs {
+	for i := 0; i < len(seqs); i++ {
+		seq := seqs[i]
 		if engine.msgType == proto.PullMsgType_BLOCK_MSG {
 			engine.logger.Criticalf("Adding %s", seq.Data.(string))
 		}
