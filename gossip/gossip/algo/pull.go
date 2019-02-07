@@ -300,11 +300,13 @@ func (engine *PullEngine) Add(seqs ...BatchedMessage) {
 			engine.State.Add(seq.Data.(string))
 			engine.Buff = append(engine.Buff, &seq)
 		}
-		ids := make([]string, len(engine.Buff))
-		for i, value := range engine.Buff {
-			ids[i] = value.Data.(string)
+		if engine.msgType == proto.PullMsgType_BLOCK_MSG {
+			ids := make([]string, len(engine.Buff))
+			for i, value := range engine.Buff {
+				ids[i] = value.Data.(string)
+			}
+			engine.logger.Criticalf("Added %s: %v %v", seq.Data.(string), ids, engine.State)
 		}
-		engine.logger.Criticalf("Added %s: %v %v", seq.Data.(string), ids, engine.State)
 	}
 }
 
