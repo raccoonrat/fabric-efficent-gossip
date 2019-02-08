@@ -345,26 +345,24 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	msg := m.GetGossipMessage()
 	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg.Content)
 	if msg.IsDataMsg() {
-		g.logger.Criticalf("Received block #%d from %v", msg.GetDataMsg().Payload.SeqNum, m.GetConnectionInfo().ID)
+		g.logger.Criticalf("Received pushed block #%d-%d-%d from %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTTL, msg.GetDataMsg().PullTTL, m.GetConnectionInfo().ID)
 	}
-	if msg.IsPullMsg() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
-		if msg.IsHelloMsg() {
-			g.logger.Criticalf("Received PullMsg Hello from %v", m.GetConnectionInfo().ID)
-		}
-		if msg.IsDigestMsg() {
-			g.logger.Criticalf("Received PullMsg Digest %v from %v", msg.GetDataDig().Digests, m.GetConnectionInfo().ID)
-		}
-		if msg.IsDataReq() {
-			g.logger.Criticalf("Received PullMsg Request %v from %v", msg.GetDataReq().Digests, m.GetConnectionInfo().ID)
-		}
+	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
 		if msg.IsDataUpdate() {
-			var seqs []uint64
-			seqs = make([]uint64, len(msg.GetDataUpdate().Data))
+			type pulledMessage struct {
+				seq_num  uint64
+				push_ttl int32
+				pull_ttl int32
+			}
+			var blocks []pulledMessage
+			blocks = make([]pulledMessage, len(msg.GetDataUpdate().Data))
 			for i, pulledMsg := range msg.GetDataUpdate().Data {
 				dataMsg, _ := pulledMsg.ToGossipMessage()
-				seqs[i] = dataMsg.GetDataMsg().Payload.SeqNum
+				blocks[i].seq_num = dataMsg.GetDataMsg().Payload.SeqNum
+				blocks[i].push_ttl = dataMsg.GetDataMsg().PushTTL
+				blocks[i].pull_ttl = dataMsg.GetDataMsg().PullTTL
 			}
-			g.logger.Criticalf("Received PullMsg Update %v from %v", seqs, m.GetConnectionInfo().ID)
+			g.logger.Criticalf("Received pulled blocks %v from %v", blocks, m.GetConnectionInfo().ID)
 		}
 	}
 	defer g.logger.Debug("Exiting")

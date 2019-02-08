@@ -261,18 +261,6 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 		msg.Sign(msg.Signer)
 	}
 
-	if msg.IsDataMsg() {
-		conn.logger.Criticalf("Pushing block #%d push_ttl:%d pull_ttl:%d to %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTTL, msg.GetDataMsg().PullTTL, conn.pkiID)
-	}
-	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
-		for _, data := range msg.GetDataUpdate().Data {
-			gossipMsg, err := data.ToGossipMessage()
-			if err == nil && gossipMsg.IsDataMsg() {
-				conn.logger.Criticalf("%v pulling block #%d push_ttl:%d pull_ttl:%d", conn.pkiID, gossipMsg.GetDataMsg().Payload.SeqNum, gossipMsg.GetDataMsg().PushTTL, gossipMsg.GetDataMsg().PullTTL)
-			}
-		}
-	}
-
 	m := &msgSending{
 		envelope: msg.Envelope,
 		onErr:    onErr,
