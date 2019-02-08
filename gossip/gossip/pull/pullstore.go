@@ -252,6 +252,7 @@ func (p *pullMediatorImpl) Remove(digest string) {
 // SelectPeers returns a slice of peers which the engine will initiate the protocol with
 func (p *pullMediatorImpl) SelectPeers() []string {
 	remotePeers := SelectEndpoints(p.config.PeerCountToSelect, p.MemSvc.GetMembership())
+	p.logger.Criticalf("Selected %d peers of %v: %v", p.config.PeerCountToSelect, p.MemSvc.GetMembership(), remotePeers)
 	endpoints := make([]string, len(remotePeers))
 	for i, peer := range remotePeers {
 		endpoints[i] = peer.Endpoint
