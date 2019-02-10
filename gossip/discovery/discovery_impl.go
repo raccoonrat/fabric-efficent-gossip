@@ -923,6 +923,7 @@ func (d *gossipDiscoveryImpl) GetMembership() []NetworkMember {
 			Envelope:         m.Envelope,
 		})
 	}
+	d.logger.Criticalf("Returning membership of size %d", len(response))
 	return response
 
 }
