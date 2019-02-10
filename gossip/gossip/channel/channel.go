@@ -169,6 +169,7 @@ func (mf *membershipFilter) GetMembership() []discovery.NetworkMember {
 			members = append(members, mem)
 		}
 	}
+	mf.logger.Criticalf("[membershipFilter::GetMembership] Selected membership of size %d from %d", len(members), len(mf.adapter.GetMembership()))
 	return members
 }
 
