@@ -168,7 +168,7 @@ peer:
         propagatePeerNum: 3
         # Determines frequency of pull phases(unit: second)
         # Must be greater than digestWaitTime + responseWaitTime
-        pullInterval: 4s
+        pullInterval: 86400s
         # Number of peers to pull from
         pullPeerNum: 3
         # Determines frequency of pulling state info messages from peers(unit: second)
