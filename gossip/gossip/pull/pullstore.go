@@ -232,9 +232,6 @@ func (p *pullMediatorImpl) Add(msg *proto.SignedGossipMessage) {
 	p.Lock()
 	var iterationsLeft *int32 = nil
 	if msg.IsDataMsg() {
-		if msg.GetDataMsg().PullTTL == 0 {
-			return
-		}
 		iterationsLeft = &msg.GetDataMsg().PullTTL
 	}
 	defer p.Unlock()
