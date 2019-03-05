@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	protobuff "github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/gossip/api"
 	"github.com/hyperledger/fabric/gossip/comm"
 	"github.com/hyperledger/fabric/gossip/common"
@@ -454,6 +455,16 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 	msgs2Gossip := make([]*emittedGossipMessage, len(a))
 	for i, e := range a {
 		msgs2Gossip[i] = e.(*emittedGossipMessage)
+		if msgs2Gossip[i].IsDataMsg() {
+			var msg proto.GossipMessage
+			payload, _ := protobuff.Marshal(msgs2Gossip[i].GossipMessage)
+			protobuff.Unmarshal(payload, &msg)
+			msgs2Gossip[i].SignedGossipMessage = &proto.SignedGossipMessage{
+				Envelope:      nil,
+				GossipMessage: &msg,
+				Signer:        msgs2Gossip[i].Signer,
+			}
+		}
 	}
 	g.gossipBatch(msgs2Gossip)
 }
