@@ -457,6 +457,7 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 		msgs2Gossip[i] = e.(*emittedGossipMessage)
 		if msgs2Gossip[i].IsDataMsg() {
 			var msg proto.GossipMessage
+			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
 			payload, _ := protobuff.Marshal(msgs2Gossip[i].GossipMessage)
 			protobuff.Unmarshal(payload, &msg)
 			msgs2Gossip[i].SignedGossipMessage = &proto.SignedGossipMessage{
@@ -464,6 +465,7 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 				GossipMessage: &msg,
 				Signer:        msgs2Gossip[i].Signer,
 			}
+			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
 		}
 	}
 	g.gossipBatch(msgs2Gossip)
