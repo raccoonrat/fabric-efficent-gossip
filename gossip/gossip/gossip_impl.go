@@ -453,8 +453,9 @@ func (g *gossipServiceImpl) validateMsg(msg proto.ReceivedMessage) bool {
 
 func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 	msgs2Gossip := make([]*emittedGossipMessage, len(a))
-	for i, e := range a {
-		msgs2Gossip[i] = e.(*emittedGossipMessage)
+	for i := 0; i < len(a); i++ {
+		// for i, e := range a {
+		msgs2Gossip[i] = a[i].(*emittedGossipMessage)
 		if msgs2Gossip[i].IsDataMsg() {
 			var msg proto.GossipMessage
 			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
