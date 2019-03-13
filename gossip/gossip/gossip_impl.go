@@ -460,11 +460,12 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
 			payload, _ := protobuff.Marshal(msgs2Gossip[i].GossipMessage)
 			protobuff.Unmarshal(payload, &msg)
-			/*msgs2Gossip[i].SignedGossipMessage = &proto.SignedGossipMessage{
+			signer := msgs2Gossip[i].Signer
+			msgs2Gossip[i].SignedGossipMessage = &proto.SignedGossipMessage{
 				Envelope:      nil,
 				GossipMessage: &msg,
-				Signer:        msgs2Gossip[i].Signer,
-			}*/
+				Signer:        signer,
+			}
 			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
 			g.logger.Criticalf("Sending ~%d-%d-%d", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTTL, msg.GetDataMsg().PullTTL)
 		}
