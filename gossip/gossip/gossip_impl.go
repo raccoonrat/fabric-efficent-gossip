@@ -453,23 +453,20 @@ func (g *gossipServiceImpl) validateMsg(msg proto.ReceivedMessage) bool {
 
 func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 	msgs2Gossip := make([]*emittedGossipMessage, len(a))
-	for i := 0; i < len(a); i++ {
-		// for i, e := range a {
-		msgs2Gossip[i] = a[i].(*emittedGossipMessage)
+	for i, e := range a {
+		msgs2Gossip[i] = e.(*emittedGossipMessage)
 		if msgs2Gossip[i].IsDataMsg() {
 			var msg proto.GossipMessage
-			g.logger.Criticalf("Sending ~%d-%d-%d", a[i].(*emittedGossipMessage).GetDataMsg().Payload.SeqNum, a[i].(*emittedGossipMessage).GetDataMsg().PushTTL, a[i].(*emittedGossipMessage).GetDataMsg().PullTTL)
-			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
 			payload, _ := protobuff.Marshal(msgs2Gossip[i].GossipMessage)
 			protobuff.Unmarshal(payload, &msg)
-			signer := msgs2Gossip[i].Signer
-			msgs2Gossip[i].SignedGossipMessage = &proto.SignedGossipMessage{
-				Envelope:      nil,
-				GossipMessage: &msg,
-				Signer:        signer,
+			msgs2Gossip[i] = &emittedGossipMessage{
+				SignedGossipMessage: &proto.SignedGossipMessage{
+					Envelope:      nil,
+					GossipMessage: &msg,
+					Signer:        msgs2Gossip[i].Signer,
+				},
+				filter: msgs2Gossip[i].filter,
 			}
-			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
-			g.logger.Criticalf("Sending ~%d-%d-%d", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTTL, msg.GetDataMsg().PullTTL)
 		}
 	}
 	g.gossipBatch(msgs2Gossip)
