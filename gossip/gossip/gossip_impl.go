@@ -458,6 +458,7 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 		msgs2Gossip[i] = a[i].(*emittedGossipMessage)
 		if msgs2Gossip[i].IsDataMsg() {
 			var msg proto.GossipMessage
+			g.logger.Criticalf("Sending ~%d-%d-%d", a[i].(*emittedGossipMessage).GetDataMsg().Payload.SeqNum, a[i].(*emittedGossipMessage).GetDataMsg().PushTTL, a[i].(*emittedGossipMessage).GetDataMsg().PullTTL)
 			g.logger.Criticalf("Sending ~%d-%d-%d", msgs2Gossip[i].GetDataMsg().Payload.SeqNum, msgs2Gossip[i].GetDataMsg().PushTTL, msgs2Gossip[i].GetDataMsg().PullTTL)
 			payload, _ := protobuff.Marshal(msgs2Gossip[i].GossipMessage)
 			protobuff.Unmarshal(payload, &msg)
