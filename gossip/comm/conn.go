@@ -257,10 +257,6 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 		return
 	}
 
-	if msg.Signer != nil {
-		msg.Sign(msg.Signer)
-	}
-
 	if msg.IsDataMsg() {
 		conn.logger.Criticalf("Sending pushed block #%d-%d-%d to %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTTL, msg.GetDataMsg().PullTTL, conn.pkiID)
 	}
