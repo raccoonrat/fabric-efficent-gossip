@@ -378,7 +378,7 @@ func (gc *gossipChannel) createBlockPuller() pull.Mediator {
 		MsgType:           proto.PullMsgType_BLOCK_MSG,
 		Channel:           []byte(gc.chainID),
 		ID:                gc.GetConf().ID,
-		PeerCountToSelect: gc.GetConf().PullPeerNum,
+		PeerCountToSelect: 0,
 		PullInterval:      gc.GetConf().PullInterval,
 		Tag:               proto.GossipMessage_CHAN_AND_ORG,
 	}
