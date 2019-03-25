@@ -109,11 +109,12 @@ func (sc SendCriteria) String() string {
 
 // Config is the configuration of the gossip component
 type Config struct {
-	BindPort            int      // Port we bind to, used only for tests
-	ID                  string   // ID of this instance
-	BootstrapPeers      []string // Peers we connect to at startup
-	PropagateIterations int      // Number of times a message is pushed to remote peers
-	PropagatePeerNum    int      // Number of peers selected to push messages to
+	BindPort                   int      // Port we bind to, used only for tests
+	ID                         string   // ID of this instance
+	BootstrapPeers             []string // Peers we connect to at startup
+	PropagateIterations        int      // Number of times a message is pushed to remote peers
+	PropagateIterationsDataMsg int      // Number of times a data message is pushed to remote peers
+	PropagatePeerNum           int      // Number of peers selected to push messages to
 
 	MaxBlockCountToStore int // Maximum count of blocks we store in memory
 

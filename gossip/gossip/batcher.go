@@ -35,19 +35,20 @@ type batchingEmitter interface {
 // burstSize: a threshold that triggers a forwarding because of message count
 // latency: the maximum delay that each message can be stored without being forwarded
 // cb: a callback that is called in order for the forwarding to take place
-func newBatchingEmitter(iterations, burstSize int, latency time.Duration, cb emitBatchCallback) batchingEmitter {
+func newBatchingEmitter(iterations, iterationsDataMsg, burstSize int, latency time.Duration, cb emitBatchCallback) batchingEmitter {
 	if iterations < 0 {
 		panic(errors.Errorf("Got a negative iterations number"))
 	}
 
 	p := &batchingEmitterImpl{
-		cb:         cb,
-		delay:      latency,
-		iterations: iterations,
-		burstSize:  burstSize,
-		lock:       &sync.Mutex{},
-		buff:       make([]*batchedMessage, 0),
-		stopFlag:   int32(0),
+		cb:                cb,
+		delay:             latency,
+		iterations:        iterations,
+		iterationsDataMsg: iterationsDataMsg,
+		burstSize:         burstSize,
+		lock:              &sync.Mutex{},
+		buff:              make([]*batchedMessage, 0),
+		stopFlag:          int32(0),
 	}
 
 	if iterations != 0 {
@@ -100,13 +101,14 @@ func (p *batchingEmitterImpl) toDie() bool {
 }
 
 type batchingEmitterImpl struct {
-	iterations int
-	burstSize  int
-	delay      time.Duration
-	cb         emitBatchCallback
-	lock       *sync.Mutex
-	buff       []*batchedMessage
-	stopFlag   int32
+	iterations        int
+	iterationsDataMsg int
+	burstSize         int
+	delay             time.Duration
+	cb                emitBatchCallback
+	lock              *sync.Mutex
+	buff              []*batchedMessage
+	stopFlag          int32
 }
 
 type batchedMessage struct {
@@ -131,7 +133,14 @@ func (p *batchingEmitterImpl) Add(message interface{}) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.buff = append(p.buff, &batchedMessage{data: message, iterationsLeft: p.iterations})
+	var iterations int
+	if message.(*emittedGossipMessage).IsDataMsg() {
+		iterations = p.iterationsDataMsg
+	} else {
+		iterations = p.iterations
+	}
+
+	p.buff = append(p.buff, &batchedMessage{data: message, iterationsLeft: iterations})
 
 	if len(p.buff) >= p.burstSize {
 		p.emit()

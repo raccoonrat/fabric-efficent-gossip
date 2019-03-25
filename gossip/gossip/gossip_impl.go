@@ -105,7 +105,7 @@ func NewGossipService(conf *Config, s *grpc.Server, sa api.SecurityAdvisor,
 	}
 
 	g.chanState = newChannelState(g)
-	g.emitter = newBatchingEmitter(conf.PropagateIterations,
+	g.emitter = newBatchingEmitter(conf.PropagateIterations, conf.PropagateIterationsDataMsg,
 		conf.MaxPropagationBurstSize, conf.MaxPropagationBurstLatency,
 		g.sendGossipBatch)
 
@@ -351,7 +351,7 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
 		if msg.IsDataUpdate() {
 			type pulledMessage struct {
-				seq_num  uint64
+				seq_num uint64
 			}
 			var blocks []pulledMessage
 			blocks = make([]pulledMessage, len(msg.GetDataUpdate().Data))
