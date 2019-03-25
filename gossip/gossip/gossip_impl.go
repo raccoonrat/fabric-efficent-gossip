@@ -345,6 +345,23 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	msg := m.GetGossipMessage()
 
 	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg)
+	if msg.IsDataMsg() {
+		g.logger.Criticalf("Received pushed block #%d from %v", msg.GetDataMsg().Payload.SeqNum, m.GetConnectionInfo().ID)
+	}
+	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
+		if msg.IsDataUpdate() {
+			type pulledMessage struct {
+				seq_num  uint64
+			}
+			var blocks []pulledMessage
+			blocks = make([]pulledMessage, len(msg.GetDataUpdate().Data))
+			for i, pulledMsg := range msg.GetDataUpdate().Data {
+				dataMsg, _ := pulledMsg.ToGossipMessage()
+				blocks[i].seq_num = dataMsg.GetDataMsg().Payload.SeqNum
+			}
+			g.logger.Criticalf("Received pulled blocks %v from %v", blocks, m.GetConnectionInfo().ID)
+		}
+	}
 	defer g.logger.Debug("Exiting")
 
 	if !g.validateMsg(m) {

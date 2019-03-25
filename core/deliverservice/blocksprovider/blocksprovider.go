@@ -190,7 +190,7 @@ func (b *blocksProviderImpl) DeliverBlocks() {
 			}
 
 			// Gossip messages with other nodes
-			logger.Debugf("[%s] Gossiping block [%d], peers number [%d]", b.chainID, blockNum, numberOfPeers)
+			logger.Criticalf("[%s] Gossiping block [%d], peers number [%d]", b.chainID, blockNum, numberOfPeers)
 			if !b.isDone() {
 				b.gossip.Gossip(gossipMsg)
 			}
