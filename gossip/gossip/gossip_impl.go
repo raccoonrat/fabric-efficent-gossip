@@ -344,7 +344,7 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	}
 
 	msg := m.GetGossipMessage()
-	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg.Content)
+	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg)
 	if msg.IsDataMsg() {
 		g.logger.Criticalf("Received pushed block #%d-%d-%d from %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTTL, msg.GetDataMsg().PullTTL, m.GetConnectionInfo().ID)
 	}
