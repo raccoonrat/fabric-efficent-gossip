@@ -574,9 +574,9 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 			added = gc.stateInfoMsgStore.Add(msg.GetGossipMessage())
 		}
 
-		//if !added && m.IsDataMsg() {
-		//	gc.Forward(msg)
-		//}
+		if !added && m.IsDataMsg() {
+			gc.Forward(msg)
+		}
 
 		if added {
 			// Forward the message
