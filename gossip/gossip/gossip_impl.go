@@ -14,7 +14,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	protobuff "github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/gossip/api"
 	"github.com/hyperledger/fabric/gossip/comm"
 	"github.com/hyperledger/fabric/gossip/common"
