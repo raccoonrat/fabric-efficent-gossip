@@ -456,14 +456,22 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 	for i, e := range a {
 		msgs2Gossip[i] = e.(*emittedGossipMessage)
 		if msgs2Gossip[i].IsDataMsg() {
-			var msg proto.GossipMessage
-			payload, _ := protobuff.Marshal(msgs2Gossip[i].GossipMessage)
-			protobuff.Unmarshal(payload, &msg)
 			msgs2Gossip[i] = &emittedGossipMessage{
 				SignedGossipMessage: &proto.SignedGossipMessage{
-					Envelope:      nil,
-					GossipMessage: &msg,
-					Signer:        msgs2Gossip[i].Signer,
+					Envelope: nil,
+					GossipMessage: &proto.GossipMessage{
+						Nonce:   msgs2Gossip[i].Nonce,
+						Channel: msgs2Gossip[i].Channel,
+						Tag:     msgs2Gossip[i].Tag,
+						Content: &proto.GossipMessage_DataMsg{
+							DataMsg: &proto.DataMessage{
+								PushTTL: msgs2Gossip[i].GetDataMsg().PushTTL,
+								PullTTL: msgs2Gossip[i].GetDataMsg().PullTTL,
+								Payload: msgs2Gossip[i].GetDataMsg().Payload,
+							},
+						},
+					},
+					Signer: msgs2Gossip[i].Signer,
 				},
 				filter: msgs2Gossip[i].filter,
 			}
