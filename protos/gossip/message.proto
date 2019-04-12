@@ -82,54 +82,56 @@ message GossipMessage {
         MembershipRequest mem_req = 6;
         MembershipResponse mem_res = 7;
 
-        // Contains a ledger block
-        DataMessage data_msg = 8;
+        // Used for push
+        AdvertiseMessage adv_msg = 8;
+        RequestMessage req_msg = 9;
+        DataMessage data_msg = 10;
 
-        // Used for push&pull
-        GossipHello hello = 9;
-        DataDigest  data_dig = 10;
-        DataRequest data_req = 11;
-        DataUpdate  data_update = 12;
+        // Used for pull
+        GossipHello hello = 11;
+        DataDigest  data_dig = 12;
+        DataRequest data_req = 13;
+        DataUpdate  data_update = 14;
 
         // Empty message, used for pinging
-        Empty empty = 13;
+        Empty empty = 15;
 
         // ConnEstablish, used for establishing a connection
-        ConnEstablish conn = 14;
+        ConnEstablish conn = 16;
 
         // Used for relaying information
         // about state
-        StateInfo state_info = 15;
+        StateInfo state_info = 17;
 
         // Used for sending sets of StateInfo messages
-        StateInfoSnapshot state_snapshot = 16;
+        StateInfoSnapshot state_snapshot = 18;
 
         // Used for asking for StateInfoSnapshots
-        StateInfoPullRequest state_info_pull_req = 17;
+        StateInfoPullRequest state_info_pull_req = 19;
 
         //  Used to ask from a remote peer a set of blocks
-        RemoteStateRequest state_request = 18;
+        RemoteStateRequest state_request = 20;
 
         // Used to send a set of blocks to a remote peer
-        RemoteStateResponse state_response = 19;
+        RemoteStateResponse state_response = 21;
 
         // Used to indicate intent of peer to become leader
-        LeadershipMessage leadership_msg = 20;
+        LeadershipMessage leadership_msg = 22;
 
         // Used to learn of a peer's certificate
-        PeerIdentity peer_identity = 21;
+        PeerIdentity peer_identity = 23;
 
-        Acknowledgement ack = 22;
+        Acknowledgement ack = 24;
 
         // Used to request private data
-        RemotePvtDataRequest privateReq = 23;
+        RemotePvtDataRequest privateReq = 25;
 
         // Used to respond to private data requests
-        RemotePvtDataResponse privateRes = 24;
+        RemotePvtDataResponse privateRes = 26;
 
         // Encapsulates private data used to distribute
         // private rwset after the endorsement
-        PrivateDataMessage private_data = 25;
+        PrivateDataMessage private_data = 27;
     }
 }
 
@@ -228,11 +230,21 @@ message DataDigest {
 
 // Ledger block messages
 
+message AdvertiseMessage {
+    uint64 nonce                = 1;
+    uint64 seq_num              = 2;
+}
+
+message RequestMessage {
+    uint64 nonce = 1;
+}
+
 // DataMessage is the message that contains a block
 message DataMessage {
     int32   PushTTL = 1;
-    int32   PullTTL = 2;
-    Payload payload = 3;
+    int32   AdvTTL  = 2;
+    int32   PullTTL = 3;
+    Payload payload = 4;
 }
 
 // PrivateDataMessage message which includes private

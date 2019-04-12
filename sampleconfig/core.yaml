@@ -158,8 +158,10 @@ peer:
         maxPropagationBurstLatency: 10ms
         # Max number of messages stored until a push is triggered to remote peers
         maxPropagationBurstSize: 10
-        # Number of push rounds a block message lives
-        blockPushTtl: 4
+        # Number of push rounds for block messages
+        blockPushTtl: 3
+        # Number of advertise rounds for block messages
+        blockAdvertiseTtl: 4
         # Number of pull rounds a block message lives
         blockPullTtl: 4
         # Number of times a message is pushed to remote peers
