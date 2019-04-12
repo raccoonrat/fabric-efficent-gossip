@@ -83,7 +83,9 @@ message GossipMessage {
         MembershipResponse mem_res = 7;
 
         // Contains a ledger block
-        DataMessage data_msg = 8;
+        AdvMessage adv_msg = 8;
+        ReqMessage req_msg = 26;
+        DataMessage data_msg = 27;
 
         // Used for push&pull
         GossipHello hello = 9;
@@ -228,9 +230,18 @@ message DataDigest {
 
 // Ledger block messages
 
+message AdvMessage {
+    uint64 nonce = 1;
+    uint64 seq_num = 2;
+}
+message ReqMessage {
+    uint64 nonce = 1;
+}
 // DataMessage is the message that contains a block
 message DataMessage {
-    Payload payload = 1;
+    int32   PushTtl = 1;
+    int32   AdvTtl  = 2;
+    Payload payload = 3;
 }
 
 // PrivateDataMessage message which includes private
