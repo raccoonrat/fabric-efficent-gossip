@@ -21,6 +21,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/discovery"
 	"github.com/hyperledger/fabric/gossip/election"
 	"github.com/hyperledger/fabric/gossip/filter"
+	"github.com/hyperledger/fabric/gossip/gossip"
 	"github.com/hyperledger/fabric/gossip/gossip/msgstore"
 	"github.com/hyperledger/fabric/gossip/gossip/pull"
 	"github.com/hyperledger/fabric/gossip/util"
@@ -143,6 +144,7 @@ type gossipChannel struct {
 	stateInfoMsgStore         *stateInfoCache
 	leaderMsgStore            msgstore.MessageStore
 	chainID                   common.ChainID
+	emitter                   gossip.BatchingEmitter
 	blocksPuller              pull.Mediator
 	logger                    *logging.Logger
 	stateInfoPublishScheduler *time.Ticker
@@ -174,7 +176,7 @@ func (mf *membershipFilter) GetMembership() []discovery.NetworkMember {
 
 // NewGossipChannel creates a new GossipChannel
 func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.MessageCryptoService,
-	chainID common.ChainID, adapter Adapter, joinMsg api.JoinChannelMessage) GossipChannel {
+	chainID common.ChainID, adapter Adapter, joinMsg api.JoinChannelMessage, emitter gossip.BatchingEmitter) GossipChannel {
 	gc := &gossipChannel{
 		incTime:                   uint64(time.Now().UnixNano()),
 		selfOrg:                   org,
@@ -194,6 +196,7 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 
 	comparator := proto.NewGossipMessageComparator(adapter.GetConf().MaxBlockCountToStore)
 
+	gc.emitter = emitter
 	gc.blocksPuller = gc.createBlockPuller()
 
 	seqNumFromMsg := func(m interface{}) string {
@@ -378,7 +381,7 @@ func (gc *gossipChannel) createBlockPuller() pull.Mediator {
 		MsgType:           proto.PullMsgType_BLOCK_MSG,
 		Channel:           []byte(gc.chainID),
 		ID:                gc.GetConf().ID,
-		PeerCountToSelect: gc.GetConf().PullPeerNum,
+		PeerCountToSelect: 0,
 		PullInterval:      gc.GetConf().PullInterval,
 		Tag:               proto.GossipMessage_CHAN_AND_ORG,
 	}
@@ -549,6 +552,16 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 		return
 	}
 
+	if m.IsAdvertiseMessage() {
+		if gc.ledgerHeight < m.GetAdvMsg().SeqNum {
+
+		}
+	}
+
+	if m.IsRequestMessage() {
+		// gc.emitter.
+	}
+
 	if m.IsDataMsg() || m.IsStateInfoMsg() {
 		added := false
 
@@ -565,10 +578,17 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 				gc.logger.Warning("Failed verifying block", m.GetDataMsg().Payload.SeqNum)
 				return
 			}
+			m.Signer = func(msg []byte) ([]byte, error) {
+				return nil, nil
+			}
 			added = gc.blockMsgStore.Add(msg.GetGossipMessage())
 		} else { // StateInfoMsg verification should be handled in a layer above
 			//  since we don't have access to the id mapper here
 			added = gc.stateInfoMsgStore.Add(msg.GetGossipMessage())
+		}
+
+		if !added && m.IsDataMsg() {
+			gc.Forward(msg)
 		}
 
 		if added {
