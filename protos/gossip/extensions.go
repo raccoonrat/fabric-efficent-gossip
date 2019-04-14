@@ -126,6 +126,14 @@ func (m *GossipMessage) IsAliveMsg() bool {
 	return m.GetAliveMsg() != nil
 }
 
+func (m *GossipMessage) IsAdvertiseMessage() bool {
+	return m.GetAdvMsg() != nil
+}
+
+func (m *GossipMessage) IsRequestMessage() bool {
+	return m.GetReqMsg() != nil
+}
+
 // IsDataMsg returns whether this GossipMessage is a data message
 func (m *GossipMessage) IsDataMsg() bool {
 	return m.GetDataMsg() != nil
@@ -488,6 +496,7 @@ func (s *SecretEnvelope) InternalEndpoint() string {
 type SignedGossipMessage struct {
 	*Envelope
 	*GossipMessage
+	Signer Signer
 }
 
 func (p *Payload) toString() string {
