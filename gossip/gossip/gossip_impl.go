@@ -383,7 +383,7 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 					g.emitter.Add(&emittedGossipMessage{
 						SignedGossipMessage: msg,
 						filter:              m.GetConnectionInfo().ID.IsNotSameFilter,
-					}, -1, -1)
+					}, nil, nil)
 				}
 			}
 			if !g.toDie() {
@@ -739,14 +739,14 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 		return
 	}
 
-	var pushTtl int32
-	var advTtl int32
+	var pushTtl *int32
+	var advTtl *int32
 
-	pushTtl = -1
-	advTtl = -1
+	pushTtl = nil
+	advTtl = nil
 	if sMsg.IsDataMsg() {
-		pushTtl = sMsg.GetDataMsg().PushTtl
-		advTtl = sMsg.GetDataMsg().AdvTtl
+		pushTtl = &sMsg.GetDataMsg().PushTtl
+		advTtl = &sMsg.GetDataMsg().AdvTtl
 	}
 	g.emitter.Add(&emittedGossipMessage{
 		SignedGossipMessage: sMsg,
@@ -923,7 +923,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 				filter: func(_ common.PKIidType) bool {
 					return true
 				},
-			}, -1, -1)
+			}, nil, nil)
 		},
 		forwardFunc: func(message proto.ReceivedMessage) {
 			if g.conf.PropagateIterations == 0 {
@@ -932,7 +932,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 			g.emitter.Add(&emittedGossipMessage{
 				SignedGossipMessage: message.GetGossipMessage(),
 				filter:              message.GetConnectionInfo().ID.IsNotSameFilter,
-			}, -1, -1)
+			}, nil, nil)
 		},
 		incChan:          make(chan proto.ReceivedMessage),
 		presumedDead:     g.presumedDead,

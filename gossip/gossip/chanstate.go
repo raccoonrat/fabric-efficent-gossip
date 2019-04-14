@@ -151,19 +151,19 @@ func (ga *gossipAdapterImpl) Gossip(msg *proto.SignedGossipMessage) {
 		filter: func(_ common.PKIidType) bool {
 			return true
 		},
-	}, -1, -1)
+	}, nil, nil)
 }
 
 // Forward sends message to the next hops
 func (ga *gossipAdapterImpl) Forward(msg proto.ReceivedMessage) {
-	var pushTtl int32
-	var advTtl int32
+	var pushTtl *int32
+	var advTtl *int32
 
-	pushTtl = -1
-	advTtl = -1
+	pushTtl = nil
+	advTtl = nil
 	if msg.GetGossipMessage().IsDataMsg() {
-		pushTtl = msg.GetGossipMessage().GetDataMsg().PushTtl
-		advTtl = msg.GetGossipMessage().GetDataMsg().AdvTtl
+		pushTtl = &msg.GetGossipMessage().GetDataMsg().PushTtl
+		advTtl = &msg.GetGossipMessage().GetDataMsg().AdvTtl
 	}
 
 	ga.gossipServiceImpl.emitter.Add(&emittedGossipMessage{

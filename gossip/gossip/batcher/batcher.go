@@ -22,7 +22,7 @@ type emitBatchCallback func([]interface{})
 // If the BatchingEmitter's stored message count reaches a certain capacity, that also triggers a message dispatch
 type BatchingEmitter interface {
 	// Add adds a message to be batched
-	Add(interface{}, int32, int32)
+	Add(interface{}, *int32, *int32)
 
 	OnAdvertise()
 	OnRequest()
@@ -83,10 +83,10 @@ func (p *batchingEmitterImpl) emit() {
 	msgs2bePushed := make([]interface{}, 0)
 	msgs2beAdvertised := make([]interface{}, 0)
 	for _, v := range p.buff {
-		if v.pushesLeft != 0 {
+		if *v.pushesLeft != 0 {
 			msgs2bePushed = append(msgs2bePushed, v.data)
 		}
-		if v.advertisesLeft != 0 {
+		if *v.advertisesLeft != 0 {
 			msgs2beAdvertised = append(msgs2beAdvertised, v.data)
 		}
 	}
@@ -100,11 +100,11 @@ func (p *batchingEmitterImpl) decrementCounters() {
 	n := len(p.buff)
 	for i := 0; i < n; i++ {
 		msg := p.buff[i]
-		if msg.pushesLeft != 0 {
-			msg.pushesLeft--
+		if *msg.pushesLeft != 0 {
+			*msg.pushesLeft--
 			continue
 		}
-		msg.advertisesLeft--
+		*msg.advertisesLeft--
 	}
 }
 
@@ -112,7 +112,7 @@ func (p *batchingEmitterImpl) updateBuffer() {
 	n := len(p.buff)
 	for i := 0; i < n; i++ {
 		msg := p.buff[i]
-		if msg.pushesLeft == 0 && msg.advertisesLeft == 0 {
+		if *msg.pushesLeft == 0 && *msg.advertisesLeft == 0 {
 			p.buff = append(p.buff[:i], p.buff[i+1:]...)
 			n--
 			i--
@@ -137,8 +137,8 @@ type batchingEmitterImpl struct {
 
 type batchedMessage struct {
 	data           interface{}
-	pushesLeft     int32
-	advertisesLeft int32
+	pushesLeft     *int32
+	advertisesLeft *int32
 }
 
 func (p *batchingEmitterImpl) Stop() {
@@ -151,14 +151,31 @@ func (p *batchingEmitterImpl) Size() int {
 	return len(p.buff)
 }
 
-func (p *batchingEmitterImpl) Add(message interface{}, pushTtl int32, advTtl int32) {
-	if pushTtl == -1 {
-		pushTtl = int32(p.iterations)
+func (p *batchingEmitterImpl) Add(message interface{}, pPushTtl *int32, pAdvTtl *int32) {
+	var pushTtl *int32
+	var advTtl *int32
+
+	if pPushTtl == nil {
+		var iterations int32
+		iterations = int32(p.iterations)
+		pushTtl = &iterations
 	}
-	if advTtl == -1 {
-		advTtl = 0
+	if pAdvTtl == nil {
+		var iterations int32
+		iterations = 0
+		advTtl = &iterations
 	}
-	if pushTtl == 0 && advTtl == 0 {
+
+	/*
+		if pushTtl == -1 {
+			pushTtl = int32(p.iterations)
+		}
+		if advTtl == -1 {
+			advTtl = 0
+		}
+	*/
+
+	if *pushTtl == 0 && *advTtl == 0 {
 		return
 	}
 	p.lock.Lock()
