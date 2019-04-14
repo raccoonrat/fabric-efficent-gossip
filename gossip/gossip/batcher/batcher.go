@@ -155,11 +155,13 @@ func (p *batchingEmitterImpl) Add(message interface{}, pPushTtl *int32, pAdvTtl 
 	var pushTtl *int32
 	var advTtl *int32
 
+	pushTtl = pPushTtl
 	if pPushTtl == nil {
 		var iterations int32
 		iterations = int32(p.iterations)
 		pushTtl = &iterations
 	}
+	advTtl = pAdvTtl
 	if pAdvTtl == nil {
 		var iterations int32
 		iterations = 0
