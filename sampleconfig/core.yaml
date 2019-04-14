@@ -162,6 +162,8 @@ peer:
         propagateIterations: 1
         # Number of peers selected to push messages to
         propagatePeerNum: 3
+        pushTtl: 3
+        advTtl: 3
         # Determines frequency of pull phases(unit: second)
         # Must be greater than digestWaitTime + responseWaitTime
         pullInterval: 4s
