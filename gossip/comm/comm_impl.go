@@ -228,6 +228,10 @@ func (c *commImpl) Send(msg *proto.SignedGossipMessage, peers ...*RemotePeer) {
 	}
 	c.logger.Debug("Entering, sending", msg, "to ", len(peers), "peers")
 
+	if msg.Signer != nil {
+		msg.Sign(msg.Signer)
+	}
+
 	for _, peer := range peers {
 		go func(peer *RemotePeer, msg *proto.SignedGossipMessage) {
 			c.sendToEndpoint(peer, msg, nonBlockingSend)

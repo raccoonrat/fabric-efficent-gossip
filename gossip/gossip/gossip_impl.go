@@ -53,7 +53,7 @@ type gossipServiceImpl struct {
 	conf              *Config
 	toDieChan         chan struct{}
 	stopFlag          int32
-	emitter           batchingEmitter
+	emitter           BatchingEmitter
 	discAdapter       *discoveryAdapter
 	secAdvisor        api.SecurityAdvisor
 	chanState         *channelState
@@ -345,6 +345,27 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	msg := m.GetGossipMessage()
 
 	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg)
+	if msg.IsDataMsg() {
+		g.logger.Criticalf("Received pushed block #%d-%d-%d from %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, m.GetConnectionInfo().ID)
+	}
+	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
+		if msg.IsDataUpdate() {
+			type pulledMessage struct {
+				seq_num  uint64
+				push_ttl int32
+				pull_ttl int32
+			}
+			var blocks []pulledMessage
+			blocks = make([]pulledMessage, len(msg.GetDataUpdate().Data))
+			for i, pulledMsg := range msg.GetDataUpdate().Data {
+				dataMsg, _ := pulledMsg.ToGossipMessage()
+				blocks[i].seq_num = dataMsg.GetDataMsg().Payload.SeqNum
+				blocks[i].push_ttl = dataMsg.GetDataMsg().PushTtl
+				blocks[i].pull_ttl = dataMsg.GetDataMsg().AdvTtl
+			}
+			g.logger.Criticalf("Received pulled blocks %v from %v", blocks, m.GetConnectionInfo().ID)
+		}
+	}
 	defer g.logger.Debug("Exiting")
 
 	if !g.validateMsg(m) {
@@ -361,7 +382,7 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 					g.emitter.Add(&emittedGossipMessage{
 						SignedGossipMessage: msg,
 						filter:              m.GetConnectionInfo().ID.IsNotSameFilter,
-					})
+					}, -1, -1)
 				}
 			}
 			if !g.toDie() {
@@ -434,6 +455,27 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 	msgs2Gossip := make([]*emittedGossipMessage, len(a))
 	for i, e := range a {
 		msgs2Gossip[i] = e.(*emittedGossipMessage)
+		if msgs2Gossip[i].IsDataMsg() {
+			msgs2Gossip[i] = &emittedGossipMessage{
+				SignedGossipMessage: &proto.SignedGossipMessage{
+					Envelope: nil,
+					GossipMessage: &proto.GossipMessage{
+						Nonce:   msgs2Gossip[i].Nonce,
+						Channel: msgs2Gossip[i].Channel,
+						Tag:     msgs2Gossip[i].Tag,
+						Content: &proto.GossipMessage_DataMsg{
+							DataMsg: &proto.DataMessage{
+								PushTtl: msgs2Gossip[i].GetDataMsg().PushTtl,
+								AdvTtl:  msgs2Gossip[i].GetDataMsg().AdvTtl,
+								Payload: msgs2Gossip[i].GetDataMsg().Payload,
+							},
+						},
+					},
+					Signer: msgs2Gossip[i].Signer,
+				},
+				filter: msgs2Gossip[i].filter,
+			}
+		}
 	}
 	g.gossipBatch(msgs2Gossip)
 }
@@ -486,13 +528,13 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*emittedGossipMessage) {
 	blocks, msgs = partitionMessages(isABlock, msgs)
 	g.gossipInChan(blocks, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
-	})
+	}, g.conf.PropagatePeerNum)
 
 	// Gossip Leadership messages
 	leadershipMsgs, msgs = partitionMessages(isLeadershipMsg, msgs)
 	g.gossipInChan(leadershipMsgs, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
-	})
+	}, g.conf.PropagatePeerNum)
 
 	// Gossip StateInfo messages
 	stateInfoMsgs, msgs = partitionMessages(isAStateInfoMsg, msgs)
@@ -551,7 +593,7 @@ func (g *gossipServiceImpl) sendAndFilterSecrets(msg *proto.SignedGossipMessage,
 }
 
 // gossipInChan gossips a given GossipMessage slice according to a channel's routing policy.
-func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory) {
+func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory, peers int) {
 	if len(messages) == 0 {
 		return
 	}
@@ -582,7 +624,7 @@ func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanR
 		if messagesOfChannel[0].IsLeadershipMsg() {
 			peers2Send = filter.SelectPeers(len(membership), membership, chanRoutingFactory(gc))
 		} else {
-			peers2Send = filter.SelectPeers(g.conf.PropagatePeerNum, membership, chanRoutingFactory(gc))
+			peers2Send = filter.SelectPeers(peers, membership, chanRoutingFactory(gc))
 		}
 
 		// Send the messages to the remote peers
@@ -667,6 +709,9 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 	var err error
 	if sMsg.IsDataMsg() {
 		sMsg, err = sMsg.NoopSign()
+		sMsg.Signer = func(msg []byte) ([]byte, error) {
+			return nil, nil
+		}
 	} else {
 		_, err = sMsg.Sign(func(msg []byte) ([]byte, error) {
 			return g.mcs.Sign(msg)
@@ -692,12 +737,22 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 	if g.conf.PropagateIterations == 0 {
 		return
 	}
+
+	var pushTtl int32
+	var advTtl int32
+
+	pushTtl = -1
+	advTtl = -1
+	if sMsg.IsDataMsg() {
+		pushTtl = sMsg.GetDataMsg().PushTtl
+		advTtl = sMsg.GetDataMsg().AdvTtl
+	}
 	g.emitter.Add(&emittedGossipMessage{
 		SignedGossipMessage: sMsg,
 		filter: func(_ common.PKIidType) bool {
 			return true
 		},
-	})
+	}, pushTtl, advTtl)
 }
 
 // Send sends a message to remote peers
@@ -867,7 +922,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 				filter: func(_ common.PKIidType) bool {
 					return true
 				},
-			})
+			}, -1, -1)
 		},
 		forwardFunc: func(message proto.ReceivedMessage) {
 			if g.conf.PropagateIterations == 0 {
@@ -876,7 +931,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 			g.emitter.Add(&emittedGossipMessage{
 				SignedGossipMessage: message.GetGossipMessage(),
 				filter:              message.GetConnectionInfo().ID.IsNotSameFilter,
-			})
+			}, -1, -1)
 		},
 		incChan:          make(chan proto.ReceivedMessage),
 		presumedDead:     g.presumedDead,
