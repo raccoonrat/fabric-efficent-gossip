@@ -102,7 +102,7 @@ func (cs *channelState) joinChannel(joinMsg api.JoinChannelMessage, chainID comm
 	if gc, exists := cs.channels[string(chainID)]; !exists {
 		pkiID := cs.g.comm.GetPKIid()
 		ga := &gossipAdapterImpl{gossipServiceImpl: cs.g, Discovery: cs.g.disc}
-		gc := channel.NewGossipChannel(pkiID, cs.g.selfOrg, cs.g.mcs, chainID, ga, joinMsg)
+		gc := channel.NewGossipChannel(pkiID, cs.g.selfOrg, cs.g.mcs, chainID, ga, joinMsg, ga.emitter)
 		cs.channels[string(chainID)] = gc
 	} else {
 		gc.ConfigureChannel(joinMsg)
@@ -151,15 +151,25 @@ func (ga *gossipAdapterImpl) Gossip(msg *proto.SignedGossipMessage) {
 		filter: func(_ common.PKIidType) bool {
 			return true
 		},
-	})
+	}, -1, -1)
 }
 
 // Forward sends message to the next hops
 func (ga *gossipAdapterImpl) Forward(msg proto.ReceivedMessage) {
+	var pushTtl int32
+	var advTtl int32
+
+	pushTtl = -1
+	advTtl = -1
+	if msg.GetGossipMessage().IsDataMsg() {
+		pushTtl = msg.GetGossipMessage().GetDataMsg().PushTtl
+		advTtl = msg.GetGossipMessage().GetDataMsg().AdvTtl
+	}
+
 	ga.gossipServiceImpl.emitter.Add(&emittedGossipMessage{
 		SignedGossipMessage: msg.GetGossipMessage(),
 		filter:              msg.GetConnectionInfo().ID.IsNotSameFilter,
-	})
+	}, pushTtl, advTtl)
 }
 
 func (ga *gossipAdapterImpl) Send(msg *proto.SignedGossipMessage, peers ...*comm.RemotePeer) {
