@@ -21,7 +21,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/discovery"
 	"github.com/hyperledger/fabric/gossip/election"
 	"github.com/hyperledger/fabric/gossip/filter"
-	"github.com/hyperledger/fabric/gossip/gossip"
+	"github.com/hyperledger/fabric/gossip/gossip/batcher"
 	"github.com/hyperledger/fabric/gossip/gossip/msgstore"
 	"github.com/hyperledger/fabric/gossip/gossip/pull"
 	"github.com/hyperledger/fabric/gossip/util"
@@ -144,7 +144,7 @@ type gossipChannel struct {
 	stateInfoMsgStore         *stateInfoCache
 	leaderMsgStore            msgstore.MessageStore
 	chainID                   common.ChainID
-	emitter                   gossip.BatchingEmitter
+	emitter                   batcher.BatchingEmitter
 	blocksPuller              pull.Mediator
 	logger                    *logging.Logger
 	stateInfoPublishScheduler *time.Ticker
@@ -176,7 +176,7 @@ func (mf *membershipFilter) GetMembership() []discovery.NetworkMember {
 
 // NewGossipChannel creates a new GossipChannel
 func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.MessageCryptoService,
-	chainID common.ChainID, adapter Adapter, joinMsg api.JoinChannelMessage, emitter gossip.BatchingEmitter) GossipChannel {
+	chainID common.ChainID, adapter Adapter, joinMsg api.JoinChannelMessage, emitter batcher.BatchingEmitter) GossipChannel {
 	gc := &gossipChannel{
 		incTime:                   uint64(time.Now().UnixNano()),
 		selfOrg:                   org,

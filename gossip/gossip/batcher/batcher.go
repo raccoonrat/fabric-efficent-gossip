@@ -4,7 +4,7 @@ Copyright IBM Corp. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package gossip
+package batcher
 
 import (
 	"sync"
@@ -39,7 +39,7 @@ type BatchingEmitter interface {
 // burstSize: a threshold that triggers a forwarding because of message count
 // latency: the maximum delay that each message can be stored without being forwarded
 // cb: a callback that is called in order for the forwarding to take place
-func newBatchingEmitter(iterations, burstSize int, latency time.Duration, cb emitBatchCallback) BatchingEmitter {
+func NewBatchingEmitter(iterations, burstSize int, latency time.Duration, cb emitBatchCallback) BatchingEmitter {
 	if iterations < 0 {
 		panic(errors.Errorf("Got a negative iterations number"))
 	}
