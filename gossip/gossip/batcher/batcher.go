@@ -53,6 +53,7 @@ func NewBatchingEmitter(iterations, burstSize int, latency time.Duration, cb emi
 		lock:       &sync.Mutex{},
 		buff:       make([]*batchedMessage, 0),
 		stopFlag:   int32(0),
+		nonces:     make(map[uint64]*gossip.GossipMessage),
 	}
 
 	if iterations != 0 {
