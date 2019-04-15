@@ -52,6 +52,7 @@ func NewBatchingEmitter(iterations, burstSize int, latency time.Duration, cb emi
 		iterations: iterations,
 		burstSize:  burstSize,
 		lock:       &sync.Mutex{},
+		mapLock:    &sync.Mutex{},
 		buff:       make([]*batchedMessage, 0),
 		stopFlag:   int32(0),
 		nonces:     make(map[uint64]*gossip.GossipMessage),
@@ -130,9 +131,15 @@ func (p *batchingEmitterImpl) emit() {
 					return true
 				},
 			}
+			p.mapLock.Lock()
 			p.nonces[nonce] = msg
+			p.mapLock.Unlock()
 			msgs2beAdvertised = append(msgs2beAdvertised, amsg)
-			time.AfterFunc(time.Duration(1000)*time.Millisecond, func() { delete(p.nonces, nonce) })
+			time.AfterFunc(time.Duration(1000)*time.Millisecond, func() {
+				p.mapLock.Lock()
+				delete(p.nonces, nonce)
+				p.mapLock.Unlock()
+			})
 		}
 	}
 
@@ -176,6 +183,7 @@ type batchingEmitterImpl struct {
 	delay      time.Duration
 	cb         emitBatchCallback
 	lock       *sync.Mutex
+	mapLock    *sync.Mutex
 	buff       []*batchedMessage
 	nonces     map[uint64]*gossip.GossipMessage
 	stopFlag   int32
@@ -242,8 +250,10 @@ func (p *batchingEmitterImpl) OnAdvertise(msg gossip.ReceivedMessage) {
 }
 
 func (p *batchingEmitterImpl) OnRequest(msg gossip.ReceivedMessage) {
-	if _, ok := p.nonces[msg.GetGossipMessage().GetAdvMsg().Nonce]; ok {
-		resp := p.nonces[msg.GetGossipMessage().GetAdvMsg().Nonce]
+	p.mapLock.Lock()
+	resp, ok := p.nonces[msg.GetGossipMessage().GetAdvMsg().Nonce]
+	p.mapLock.Unlock()
+	if ok {
 		msg.Respond(resp)
 	}
 }
