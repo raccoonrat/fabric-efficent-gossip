@@ -146,9 +146,9 @@ func (ga *gossipAdapterImpl) Sign(msg *proto.GossipMessage) (*proto.SignedGossip
 
 // Gossip gossips a message
 func (ga *gossipAdapterImpl) Gossip(msg *proto.SignedGossipMessage) {
-	ga.gossipServiceImpl.emitter.Add(&emittedGossipMessage{
+	ga.gossipServiceImpl.emitter.Add(&common.EmittedGossipMessage{
 		SignedGossipMessage: msg,
-		filter: func(_ common.PKIidType) bool {
+		Filter: func(_ common.PKIidType) bool {
 			return true
 		},
 	}, nil, nil)
@@ -166,9 +166,9 @@ func (ga *gossipAdapterImpl) Forward(msg proto.ReceivedMessage) {
 		advTtl = &msg.GetGossipMessage().GetDataMsg().AdvTtl
 	}
 
-	ga.gossipServiceImpl.emitter.Add(&emittedGossipMessage{
+	ga.gossipServiceImpl.emitter.Add(&common.EmittedGossipMessage{
 		SignedGossipMessage: msg.GetGossipMessage(),
-		filter:              msg.GetConnectionInfo().ID.IsNotSameFilter,
+		Filter:              msg.GetConnectionInfo().ID.IsNotSameFilter,
 	}, pushTtl, advTtl)
 }
 
