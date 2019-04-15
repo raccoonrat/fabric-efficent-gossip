@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/util"
 	"github.com/hyperledger/fabric/protos/gossip"
 	"github.com/pkg/errors"
@@ -96,7 +95,7 @@ func (p *batchingEmitterImpl) emit() {
 			msgs2bePushed = append(msgs2bePushed, v.data)
 		}
 		if *v.advertisesLeft != 0 {
-			emsg := v.data.(*common.EmittedGossipMessage)
+			emsg := v.data.(*gossip.EmittedGossipMessage)
 			nonce := p.newNONCE()
 			msg := &gossip.GossipMessage{
 				Nonce:   0,
@@ -110,7 +109,7 @@ func (p *batchingEmitterImpl) emit() {
 					},
 				},
 			}
-			amsg := &common.EmittedGossipMessage{
+			amsg := &gossip.EmittedGossipMessage{
 				SignedGossipMessage: &gossip.SignedGossipMessage{
 					Envelope: nil,
 					GossipMessage: &gossip.GossipMessage{
