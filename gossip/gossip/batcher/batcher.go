@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hyperledger/fabric/gossip/common"
+	"github.com/hyperledger/fabric/gossip/util"
 	"github.com/hyperledger/fabric/protos/gossip"
 	"github.com/pkg/errors"
 )
@@ -24,8 +26,8 @@ type BatchingEmitter interface {
 	// Add adds a message to be batched
 	Add(interface{}, *int32, *int32)
 
-	OnAdvertise()
-	OnRequest()
+	OnAdvertise(message gossip.ReceivedMessage)
+	OnRequest(message gossip.ReceivedMessage)
 
 	// Stop stops the component
 	Stop()
@@ -70,7 +72,14 @@ func (p *batchingEmitterImpl) periodicEmit() {
 	}
 }
 
-func (p *batchingEmitterImpl) advertise(msgs []interface{}) {
+func (p *batchingEmitterImpl) newNONCE() uint64 {
+	n := uint64(0)
+	for {
+		n = util.RandomUInt64()
+		if _, ok := p.nonces[n]; !ok {
+			return n
+		}
+	}
 }
 
 func (p *batchingEmitterImpl) emit() {
@@ -87,12 +96,45 @@ func (p *batchingEmitterImpl) emit() {
 			msgs2bePushed = append(msgs2bePushed, v.data)
 		}
 		if *v.advertisesLeft != 0 {
-			msgs2beAdvertised = append(msgs2beAdvertised, v.data)
+			emsg := v.data.(*common.EmittedGossipMessage)
+			nonce := p.newNONCE()
+			msg := &gossip.GossipMessage{
+				Nonce:   0,
+				Tag:     gossip.GossipMessage_CHAN_AND_ORG,
+				Channel: emsg.Channel,
+				Content: &gossip.GossipMessage_DataMsg{
+					DataMsg: &gossip.DataMessage{
+						PushTtl: *v.pushesLeft,
+						AdvTtl:  *v.advertisesLeft,
+						Payload: emsg.GetDataMsg().Payload,
+					},
+				},
+			}
+			amsg := &common.EmittedGossipMessage{
+				SignedGossipMessage: &gossip.SignedGossipMessage{
+					Envelope: nil,
+					GossipMessage: &gossip.GossipMessage{
+						Nonce:   0,
+						Tag:     gossip.GossipMessage_CHAN_AND_ORG,
+						Channel: emsg.Channel,
+						Content: &gossip.GossipMessage_AdvMsg{
+							AdvMsg: &gossip.AdvertiseMessage{
+								Nonce:  0,
+								SeqNum: emsg.GetDataMsg().Payload.SeqNum,
+							},
+						},
+					},
+				},
+			}
+			p.nonces[nonce] = msg
+			msgs2beAdvertised = append(msgs2beAdvertised, amsg)
+			time.AfterFunc(time.Duration(1000)*time.Millisecond, func() { delete(p.nonces, nonce) })
 		}
 	}
 
 	p.decrementCounters()
 	p.cb(msgs2bePushed)
+	p.cb(msgs2beAdvertised)
 	p.updateBuffer()
 }
 
@@ -131,7 +173,7 @@ type batchingEmitterImpl struct {
 	cb         emitBatchCallback
 	lock       *sync.Mutex
 	buff       []*batchedMessage
-	nonces     map[uint64]*batchedMessage
+	nonces     map[uint64]*gossip.GossipMessage
 	stopFlag   int32
 }
 
@@ -168,15 +210,6 @@ func (p *batchingEmitterImpl) Add(message interface{}, pPushTtl *int32, pAdvTtl 
 		advTtl = &iterations
 	}
 
-	/*
-		if pushTtl == -1 {
-			pushTtl = int32(p.iterations)
-		}
-		if advTtl == -1 {
-			advTtl = 0
-		}
-	*/
-
 	if *pushTtl == 0 && *advTtl == 0 {
 		return
 	}
@@ -190,19 +223,23 @@ func (p *batchingEmitterImpl) Add(message interface{}, pPushTtl *int32, pAdvTtl 
 	}
 }
 
-func (p *batchingEmitterImpl) OnAdvertise() {
-	/*msg := gossip.SignedGossipMessage{
-
+func (p *batchingEmitterImpl) OnAdvertise(msg gossip.ReceivedMessage) {
+	reqMsg := &gossip.GossipMessage{
+		Channel: msg.GetGossipMessage().Channel,
+		Tag:     msg.GetGossipMessage().Tag,
+		Nonce:   0,
+		Content: &gossip.GossipMessage_ReqMsg{
+			ReqMsg: &gossip.RequestMessage{
+				Nonce: msg.GetGossipMessage().GetAdvMsg().Nonce,
+			},
+		},
 	}
-	*/
+	msg.Respond(reqMsg)
 }
 
-func (p *batchingEmitterImpl) OnRequest() {
-	var msg gossip.SignedGossipMessage
-	if _, ok := p.nonces[msg.GetAdvMsg().Nonce]; ok {
-		resp := p.nonces[msg.GetAdvMsg().Nonce]
-		msgs2beEmitted := make([]interface{}, 1)
-		msgs2beEmitted[0] = resp.data
-		p.cb(msgs2beEmitted)
+func (p *batchingEmitterImpl) OnRequest(msg gossip.ReceivedMessage) {
+	if _, ok := p.nonces[msg.GetGossipMessage().GetAdvMsg().Nonce]; ok {
+		resp := p.nonces[msg.GetGossipMessage().GetAdvMsg().Nonce]
+		msg.Respond(resp)
 	}
 }
