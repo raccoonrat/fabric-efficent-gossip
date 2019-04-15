@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/util"
 	"github.com/hyperledger/fabric/protos/gossip"
 	"github.com/pkg/errors"
@@ -124,6 +125,9 @@ func (p *batchingEmitterImpl) emit() {
 							},
 						},
 					},
+				},
+				Filter: func(_ common.PKIidType) bool {
+					return true
 				},
 			}
 			p.nonces[nonce] = msg
