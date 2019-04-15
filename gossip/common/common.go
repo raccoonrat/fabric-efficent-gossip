@@ -6,7 +6,10 @@ SPDX-License-Identifier: Apache-2.0
 
 package common
 
-import "bytes"
+import (
+	"bytes"
+	"github.com/hyperledger/fabric/protos/gossip"
+)
 
 func init() {
 	// This is just to satisfy the code coverage tool
@@ -61,3 +64,10 @@ const (
 	// MessageInvalidated means message is invalidated by the other message
 	MessageInvalidated
 )
+
+// EmittedGossipMessage encapsulates signed gossip message to compose
+// with routing filter to be used while message is forwarded
+type EmittedGossipMessage struct {
+	*gossip.SignedGossipMessage
+	Filter func(id PKIidType) bool
+}
