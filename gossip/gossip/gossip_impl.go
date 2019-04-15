@@ -349,6 +349,9 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	if msg.IsDataMsg() {
 		g.logger.Criticalf("Received pushed block #%d-%d-%d from %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, m.GetConnectionInfo().ID)
 	}
+	if msg.IsAdvertiseMessage() {
+		g.logger.Criticalf("Received advertised block #%d from %v", msg.GetAdvMsg().SeqNum, m.GetConnectionInfo().ID)
+	}
 	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
 		if msg.IsDataUpdate() {
 			type pulledMessage struct {
@@ -380,9 +383,9 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 			// in case it's a StateInfo message
 			if g.isInMyorg(discovery.NetworkMember{PKIid: m.GetConnectionInfo().ID}) && msg.IsStateInfoMsg() {
 				if g.stateInfoMsgStore.Add(msg) {
-					g.emitter.Add(&emittedGossipMessage{
+					g.emitter.Add(&common.EmittedGossipMessage{
 						SignedGossipMessage: msg,
-						filter:              m.GetConnectionInfo().ID.IsNotSameFilter,
+						Filter:              m.GetConnectionInfo().ID.IsNotSameFilter,
 					}, nil, nil)
 				}
 			}
@@ -453,11 +456,11 @@ func (g *gossipServiceImpl) validateMsg(msg proto.ReceivedMessage) bool {
 }
 
 func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
-	msgs2Gossip := make([]*emittedGossipMessage, len(a))
+	msgs2Gossip := make([]*common.EmittedGossipMessage, len(a))
 	for i, e := range a {
-		msgs2Gossip[i] = e.(*emittedGossipMessage)
+		msgs2Gossip[i] = e.(*common.EmittedGossipMessage)
 		if msgs2Gossip[i].IsDataMsg() {
-			msgs2Gossip[i] = &emittedGossipMessage{
+			msgs2Gossip[i] = &common.EmittedGossipMessage{
 				SignedGossipMessage: &proto.SignedGossipMessage{
 					Envelope: nil,
 					GossipMessage: &proto.GossipMessage{
@@ -474,7 +477,7 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 					},
 					Signer: msgs2Gossip[i].Signer,
 				},
-				filter: msgs2Gossip[i].filter,
+				Filter: msgs2Gossip[i].Filter,
 			}
 		}
 	}
@@ -493,25 +496,26 @@ func (g *gossipServiceImpl) sendGossipBatch(a []interface{}) {
 // to the same set of peers.
 // The rest of the messages that have no restrictions on their destinations can be sent
 // to any group of peers.
-func (g *gossipServiceImpl) gossipBatch(msgs []*emittedGossipMessage) {
+func (g *gossipServiceImpl) gossipBatch(msgs []*common.EmittedGossipMessage) {
 	if g.disc == nil {
 		g.logger.Error("Discovery has not been initialized yet, aborting!")
 		return
 	}
 
-	var blocks []*emittedGossipMessage
-	var stateInfoMsgs []*emittedGossipMessage
-	var orgMsgs []*emittedGossipMessage
-	var leadershipMsgs []*emittedGossipMessage
+	var advertiseMsgs []*common.EmittedGossipMessage
+	var blocks []*common.EmittedGossipMessage
+	var stateInfoMsgs []*common.EmittedGossipMessage
+	var orgMsgs []*common.EmittedGossipMessage
+	var leadershipMsgs []*common.EmittedGossipMessage
 
 	isABlock := func(o interface{}) bool {
-		return o.(*emittedGossipMessage).IsDataMsg()
+		return o.(*common.EmittedGossipMessage).IsDataMsg()
 	}
 	isAStateInfoMsg := func(o interface{}) bool {
-		return o.(*emittedGossipMessage).IsStateInfoMsg()
+		return o.(*common.EmittedGossipMessage).IsStateInfoMsg()
 	}
 	aliveMsgsWithNoEndpointAndInOurOrg := func(o interface{}) bool {
-		msg := o.(*emittedGossipMessage)
+		msg := o.(*common.EmittedGossipMessage)
 		if !msg.IsAliveMsg() {
 			return false
 		}
@@ -519,11 +523,20 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*emittedGossipMessage) {
 		return member.Endpoint == "" && g.isInMyorg(discovery.NetworkMember{PKIid: member.PkiId})
 	}
 	isOrgRestricted := func(o interface{}) bool {
-		return aliveMsgsWithNoEndpointAndInOurOrg(o) || o.(*emittedGossipMessage).IsOrgRestricted()
+		return aliveMsgsWithNoEndpointAndInOurOrg(o) || o.(*common.EmittedGossipMessage).IsOrgRestricted()
 	}
 	isLeadershipMsg := func(o interface{}) bool {
-		return o.(*emittedGossipMessage).IsLeadershipMsg()
+		return o.(*common.EmittedGossipMessage).IsLeadershipMsg()
 	}
+	isAdvertise := func(o interface{}) bool {
+		return o.(*common.EmittedGossipMessage).IsAdvertiseMessage()
+	}
+
+	// advertisement
+	advertiseMsgs, msgs = partitionMessages(isAdvertise, msgs)
+	g.gossipInChan(advertiseMsgs, func(gc channel.GossipChannel) filter.RoutingFilter {
+		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
+	}, g.conf.PropagatePeerNum)
 
 	// Gossip blocks
 	blocks, msgs = partitionMessages(isABlock, msgs)
@@ -547,7 +560,7 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*emittedGossipMessage) {
 		}
 
 		peerSelector = filter.CombineRoutingFilters(peerSelector, func(member discovery.NetworkMember) bool {
-			return stateInfMsg.filter(member.PKIid)
+			return stateInfMsg.Filter(member.PKIid)
 		})
 
 		peers2Send := filter.SelectPeers(g.conf.PropagatePeerNum, g.disc.GetMembership(), peerSelector)
@@ -569,7 +582,7 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*emittedGossipMessage) {
 		}
 		selectByOriginOrg := g.peersByOriginOrgPolicy(discovery.NetworkMember{PKIid: msg.GetAliveMsg().Membership.PkiId})
 		selector := filter.CombineRoutingFilters(selectByOriginOrg, func(member discovery.NetworkMember) bool {
-			return msg.filter(member.PKIid)
+			return msg.Filter(member.PKIid)
 		})
 		peers2Send := filter.SelectPeers(g.conf.PropagatePeerNum, g.disc.GetMembership(), selector)
 		g.sendAndFilterSecrets(msg.SignedGossipMessage, peers2Send...)
@@ -594,19 +607,19 @@ func (g *gossipServiceImpl) sendAndFilterSecrets(msg *proto.SignedGossipMessage,
 }
 
 // gossipInChan gossips a given GossipMessage slice according to a channel's routing policy.
-func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory, peers int) {
+func (g *gossipServiceImpl) gossipInChan(messages []*common.EmittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory, peers int) {
 	if len(messages) == 0 {
 		return
 	}
 	totalChannels := extractChannels(messages)
 	var channel common.ChainID
-	var messagesOfChannel []*emittedGossipMessage
+	var messagesOfChannel []*common.EmittedGossipMessage
 	for len(totalChannels) > 0 {
 		// Take first channel
 		channel, totalChannels = totalChannels[0], totalChannels[1:]
 		// Extract all messages of that channel
 		grabMsgs := func(o interface{}) bool {
-			return bytes.Equal(o.(*emittedGossipMessage).Channel, channel)
+			return bytes.Equal(o.(*common.EmittedGossipMessage).Channel, channel)
 		}
 		messagesOfChannel, messages = partitionMessages(grabMsgs, messages)
 		if len(messagesOfChannel) == 0 {
@@ -637,10 +650,10 @@ func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanR
 }
 
 // removeSelfLoop deletes from the list of peers peer which has sent the message
-func (g *gossipServiceImpl) removeSelfLoop(msg *emittedGossipMessage, peers []*comm.RemotePeer) []*comm.RemotePeer {
+func (g *gossipServiceImpl) removeSelfLoop(msg *common.EmittedGossipMessage, peers []*comm.RemotePeer) []*comm.RemotePeer {
 	var result []*comm.RemotePeer
 	for _, peer := range peers {
-		if msg.filter(peer.PKIID) {
+		if msg.Filter(peer.PKIID) {
 			result = append(result, peer)
 		}
 	}
@@ -748,9 +761,9 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 		pushTtl = &sMsg.GetDataMsg().PushTtl
 		advTtl = &sMsg.GetDataMsg().AdvTtl
 	}
-	g.emitter.Add(&emittedGossipMessage{
+	g.emitter.Add(&common.EmittedGossipMessage{
 		SignedGossipMessage: sMsg,
-		filter: func(_ common.PKIidType) bool {
+		Filter: func(_ common.PKIidType) bool {
 			return true
 		},
 	}, pushTtl, advTtl)
@@ -918,9 +931,9 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 			if g.conf.PropagateIterations == 0 {
 				return
 			}
-			g.emitter.Add(&emittedGossipMessage{
+			g.emitter.Add(&common.EmittedGossipMessage{
 				SignedGossipMessage: msg,
-				filter: func(_ common.PKIidType) bool {
+				Filter: func(_ common.PKIidType) bool {
 					return true
 				},
 			}, nil, nil)
@@ -929,9 +942,9 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 			if g.conf.PropagateIterations == 0 {
 				return
 			}
-			g.emitter.Add(&emittedGossipMessage{
+			g.emitter.Add(&common.EmittedGossipMessage{
 				SignedGossipMessage: message.GetGossipMessage(),
-				filter:              message.GetConnectionInfo().ID.IsNotSameFilter,
+				Filter:              message.GetConnectionInfo().ID.IsNotSameFilter,
 			}, nil, nil)
 		},
 		incChan:          make(chan proto.ReceivedMessage),
@@ -1357,9 +1370,9 @@ func (g *gossipServiceImpl) peersByOriginOrgPolicy(peer discovery.NetworkMember)
 // partitionMessages receives a predicate and a slice of gossip messages
 // and returns a tuple of two slices: the messages that hold for the predicate
 // and the rest
-func partitionMessages(pred common.MessageAcceptor, a []*emittedGossipMessage) ([]*emittedGossipMessage, []*emittedGossipMessage) {
-	s1 := []*emittedGossipMessage{}
-	s2 := []*emittedGossipMessage{}
+func partitionMessages(pred common.MessageAcceptor, a []*common.EmittedGossipMessage) ([]*common.EmittedGossipMessage, []*common.EmittedGossipMessage) {
+	s1 := []*common.EmittedGossipMessage{}
+	s2 := []*common.EmittedGossipMessage{}
 	for _, m := range a {
 		if pred(m) {
 			s1 = append(s1, m)
@@ -1372,7 +1385,7 @@ func partitionMessages(pred common.MessageAcceptor, a []*emittedGossipMessage) (
 
 // extractChannels returns a slice with all channels
 // of all given GossipMessages
-func extractChannels(a []*emittedGossipMessage) []common.ChainID {
+func extractChannels(a []*common.EmittedGossipMessage) []common.ChainID {
 	channels := []common.ChainID{}
 	for _, m := range a {
 		if len(m.Channel) == 0 {
