@@ -554,12 +554,12 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 
 	if m.IsAdvertiseMessage() {
 		if gc.ledgerHeight < m.GetAdvMsg().SeqNum {
-
+			gc.emitter.OnAdvertise(msg)
 		}
 	}
 
 	if m.IsRequestMessage() {
-		// gc.emitter.
+		gc.emitter.OnRequest(msg)
 	}
 
 	if m.IsDataMsg() || m.IsStateInfoMsg() {
