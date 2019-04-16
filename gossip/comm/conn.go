@@ -261,7 +261,7 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 		conn.logger.Criticalf("Sending pushed block #%d-%d-%d to %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, conn.pkiID)
 	}
 	if msg.IsAdvertiseMessage() {
-		conn.logger.Criticalf("Sending advertised block #%d to %v", msg.GetAdvMsg().SeqNum, conn.pkiID)
+		conn.logger.Criticalf("Sending advertised block #%d to %v %v", msg.GetAdvMsg().SeqNum, conn.pkiID, msg.Envelope)
 	}
 	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
 		for _, data := range msg.GetDataUpdate().Data {
