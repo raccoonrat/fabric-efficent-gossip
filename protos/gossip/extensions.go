@@ -45,6 +45,14 @@ func (mc *msgComparator) invalidationPolicy(this interface{}, that interface{}) 
 		return mc.advInvalidationPolicy(thisMsg.GetAdvMsg(), thatMsg.GetAdvMsg())
 	}
 
+	if thisMsg.IsAdvertiseMessage() && thatMsg.IsDataMsg() {
+		return mc.advDataInvalidationPolicy(thisMsg.GetAdvMsg(), thatMsg.GetDataMsg())
+	}
+
+	if thisMsg.IsDataMsg() && thatMsg.IsAdvertiseMessage() {
+		return mc.dataAdvInvalidationPolicy(thisMsg.GetDataMsg(), thatMsg.GetAdvMsg())
+	}
+
 	if thisMsg.IsDataMsg() && thatMsg.IsDataMsg() {
 		return mc.dataInvalidationPolicy(thisMsg.GetDataMsg(), thatMsg.GetDataMsg())
 	}
@@ -92,6 +100,40 @@ func (mc *msgComparator) advInvalidationPolicy(thisAdvMsg *AdvertiseMessage, tha
 	if thisAdvMsg.SeqNum > thatAdvMsg.SeqNum {
 		return common.MessageInvalidates
 	}
+	return common.MessageInvalidated
+}
+
+func (mc *msgComparator) dataAdvInvalidationPolicy(thisDataMsg *DataMessage, thatAdvMsg *AdvertiseMessage) common.InvalidationResult {
+	if thisDataMsg.Payload.SeqNum == thatAdvMsg.SeqNum {
+		return common.MessageInvalidates
+	}
+
+	diff := abs(thisDataMsg.Payload.SeqNum, thatAdvMsg.SeqNum)
+	if diff <= uint64(mc.dataBlockStorageSize) {
+		return common.MessageNoAction
+	}
+
+	if thisDataMsg.Payload.SeqNum > thatAdvMsg.SeqNum {
+		return common.MessageInvalidates
+	}
+
+	return common.MessageInvalidated
+}
+
+func (mc *msgComparator) advDataInvalidationPolicy(thisDataMsg *AdvertiseMessage, thatAdvMsg *DataMessage) common.InvalidationResult {
+	if thisDataMsg.SeqNum == thatAdvMsg.Payload.SeqNum {
+		return common.MessageInvalidated
+	}
+
+	diff := abs(thisDataMsg.SeqNum, thatAdvMsg.Payload.SeqNum)
+	if diff <= uint64(mc.dataBlockStorageSize) {
+		return common.MessageNoAction
+	}
+
+	if thisDataMsg.SeqNum > thatAdvMsg.Payload.SeqNum {
+		return common.MessageInvalidates
+	}
+
 	return common.MessageInvalidated
 }
 

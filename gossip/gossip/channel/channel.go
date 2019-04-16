@@ -556,7 +556,7 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 
 	if m.IsAdvertiseMessage() {
 		if gc.ledgerHeight <= m.GetAdvMsg().SeqNum {
-			if gc.advMsgStore.Add(msg.GetGossipMessage()) {
+			if gc.blockMsgStore.Add(msg.GetGossipMessage()) {
 				gc.emitter.OnAdvertise(msg)
 			}
 		}
