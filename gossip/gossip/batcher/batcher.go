@@ -91,6 +91,9 @@ func (p *batchingEmitterImpl) emit() {
 	if len(p.buff) == 0 {
 		return
 	}
+
+	p.decrementCounters()
+
 	msgs2bePushed := make([]interface{}, 0)
 	msgs2beAdvertised := make([]interface{}, 0)
 	for _, v := range p.buff {
@@ -148,7 +151,6 @@ func (p *batchingEmitterImpl) emit() {
 		}
 	}
 
-	p.decrementCounters()
 	p.cb(msgs2bePushed)
 	p.cb(msgs2beAdvertised)
 	p.updateBuffer()
