@@ -121,7 +121,7 @@ func (p *batchingEmitterImpl) emit() {
 						Channel: emsg.Channel,
 						Content: &gossip.GossipMessage_AdvMsg{
 							AdvMsg: &gossip.AdvertiseMessage{
-								Nonce:  0,
+								Nonce:  nonce,
 								SeqNum: emsg.GetDataMsg().Payload.SeqNum,
 							},
 						},
