@@ -536,13 +536,13 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*proto.EmittedGossipMessage) {
 	advertiseMsgs, msgs = partitionMessages(isAdvertise, msgs)
 	g.gossipInChan(advertiseMsgs, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
-	}, g.conf.PropagatePeerNum)
+	}, g.conf.AdvTtl)
 
 	// Gossip blocks
 	blocks, msgs = partitionMessages(isABlock, msgs)
 	g.gossipInChan(blocks, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
-	}, g.conf.PropagatePeerNum)
+	}, g.conf.PushTtl)
 
 	// Gossip Leadership messages
 	leadershipMsgs, msgs = partitionMessages(isLeadershipMsg, msgs)
