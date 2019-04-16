@@ -126,6 +126,9 @@ func (p *batchingEmitterImpl) emit() {
 							},
 						},
 					},
+					Signer: func(msg []byte) ([]byte, error) {
+						return nil, nil
+					},
 				},
 				Filter: func(_ common.PKIidType) bool {
 					return true
