@@ -309,6 +309,8 @@ func (g *gossipServiceImpl) start() {
 		isEmpty := gMsg.GetGossipMessage().GetEmpty() != nil
 		isPrivateData := gMsg.GetGossipMessage().IsPrivateDataMsg()
 
+		g.logger.Critical(isConn, isEmpty, isPrivateData, msg.(proto.ReceivedMessage).GetGossipMessage())
+
 		return !(isConn || isEmpty || isPrivateData)
 	}
 
