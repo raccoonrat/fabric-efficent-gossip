@@ -309,8 +309,6 @@ func (g *gossipServiceImpl) start() {
 		isEmpty := gMsg.GetGossipMessage().GetEmpty() != nil
 		isPrivateData := gMsg.GetGossipMessage().IsPrivateDataMsg()
 
-		g.logger.Critical(isConn, isEmpty, isPrivateData, msg.(proto.ReceivedMessage).GetGossipMessage())
-
 		return !(isConn || isEmpty || isPrivateData)
 	}
 
@@ -347,12 +345,15 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 
 	msg := m.GetGossipMessage()
 
-	g.logger.Critical("Entering,", m.GetConnectionInfo(), "sent us", msg)
+	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg)
 	if msg.IsDataMsg() {
 		g.logger.Criticalf("Received pushed block #%d-%d-%d from %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, m.GetConnectionInfo().ID)
 	}
 	if msg.IsAdvertiseMessage() {
-		g.logger.Criticalf("Received advertised block #%d from %v", msg.GetAdvMsg().SeqNum, m.GetConnectionInfo().ID)
+		g.logger.Criticalf("Received advertise msg #%d %d from %v", msg.GetAdvMsg().SeqNum, msg.GetAdvMsg().Nonce, m.GetConnectionInfo().ID)
+	}
+	if msg.IsRequestMessage() {
+		g.logger.Criticalf("Received request msg %d from %v", msg.GetReqMsg().Nonce, m.GetConnectionInfo().ID)
 	}
 	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
 		if msg.IsDataUpdate() {
