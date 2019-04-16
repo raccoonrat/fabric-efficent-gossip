@@ -254,7 +254,7 @@ func (p *batchingEmitterImpl) OnAdvertise(msg gossip.ReceivedMessage) {
 
 func (p *batchingEmitterImpl) OnRequest(msg gossip.ReceivedMessage) {
 	p.mapLock.Lock()
-	resp, ok := p.nonces[msg.GetGossipMessage().GetAdvMsg().Nonce]
+	resp, ok := p.nonces[msg.GetGossipMessage().GetReqMsg().Nonce]
 	p.mapLock.Unlock()
 	if ok {
 		msg.Respond(resp)
