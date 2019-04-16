@@ -161,9 +161,9 @@ peer:
         # Number of times a message is pushed to remote peers
         propagateIterations: 1
         # Number of peers selected to push messages to
-        blockPeerNum: 3
+        blockPeerNum: 4
         propagatePeerNum: 3
-        pushTtl: 1
+        pushTtl: 3
         advTtl: 3
         # Determines frequency of pull phases(unit: second)
         # Must be greater than digestWaitTime + responseWaitTime
