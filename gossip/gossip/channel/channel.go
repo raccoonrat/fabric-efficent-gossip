@@ -142,6 +142,7 @@ type gossipChannel struct {
 	joinMsg                   api.JoinChannelMessage
 	blockMsgStore             msgstore.MessageStore
 	stateInfoMsgStore         *stateInfoCache
+	advMsgStore               msgstore.MessageStore
 	leaderMsgStore            msgstore.MessageStore
 	chainID                   common.ChainID
 	emitter                   batcher.BatchingEmitter
@@ -207,6 +208,7 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 	}, gc.GetConf().BlockExpirationInterval, nil, nil, func(m interface{}) {
 		gc.blocksPuller.Remove(seqNumFromMsg(m))
 	})
+	gc.advMsgStore = msgstore.NewMessageStoreExpirable(comparator, nil, gc.GetConf().BlockExpirationInterval, nil, nil, nil)
 
 	hashPeerExpiredInMembership := func(o interface{}) bool {
 		pkiID := o.(*proto.SignedGossipMessage).GetStateInfo().PkiId
@@ -554,7 +556,9 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 
 	if m.IsAdvertiseMessage() {
 		if gc.ledgerHeight < m.GetAdvMsg().SeqNum {
-			gc.emitter.OnAdvertise(msg)
+			if gc.advMsgStore.Add(msg) {
+				gc.emitter.OnAdvertise(msg)
+			}
 		}
 	}
 

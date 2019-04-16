@@ -41,6 +41,10 @@ func (mc *msgComparator) invalidationPolicy(this interface{}, that interface{}) 
 		return aliveInvalidationPolicy(thisMsg.GetAliveMsg(), thatMsg.GetAliveMsg())
 	}
 
+	if thisMsg.IsAdvertiseMessage() && thatMsg.IsAdvertiseMessage() {
+		return mc.advInvalidationPolicy(thisMsg.GetAdvMsg(), thatMsg.GetAdvMsg())
+	}
+
 	if thisMsg.IsDataMsg() && thatMsg.IsDataMsg() {
 		return mc.dataInvalidationPolicy(thisMsg.GetDataMsg(), thatMsg.GetDataMsg())
 	}
@@ -73,6 +77,22 @@ func (mc *msgComparator) identityInvalidationPolicy(thisIdentityMsg *PeerIdentit
 	}
 
 	return common.MessageNoAction
+}
+
+func (mc *msgComparator) advInvalidationPolicy(thisAdvMsg *AdvertiseMessage, thatAdvMsg *AdvertiseMessage) common.InvalidationResult {
+	if thisAdvMsg.SeqNum == thatAdvMsg.SeqNum {
+		return common.MessageInvalidated
+	}
+
+	diff := abs(thisAdvMsg.SeqNum, thatAdvMsg.SeqNum)
+	if diff <= uint64(mc.dataBlockStorageSize) {
+		return common.MessageNoAction
+	}
+
+	if thisAdvMsg.SeqNum > thatAdvMsg.SeqNum {
+		return common.MessageInvalidates
+	}
+	return common.MessageInvalidated
 }
 
 func (mc *msgComparator) dataInvalidationPolicy(thisDataMsg *DataMessage, thatDataMsg *DataMessage) common.InvalidationResult {
