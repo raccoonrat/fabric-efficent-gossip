@@ -253,6 +253,21 @@ func (m *GossipMessage) IsTagLegal() error {
 	if m.Tag == GossipMessage_UNDEFINED {
 		return fmt.Errorf("Undefined tag")
 	}
+
+	if m.IsAdvertiseMessage() {
+		if m.Tag != GossipMessage_CHAN_AND_ORG {
+			return fmt.Errorf("Tag should be %s", GossipMessage_Tag_name[int32(GossipMessage_CHAN_AND_ORG)])
+		}
+		return nil
+	}
+
+	if m.IsRequestMessage() {
+		if m.Tag != GossipMessage_CHAN_AND_ORG {
+			return fmt.Errorf("Tag should be %s", GossipMessage_Tag_name[int32(GossipMessage_CHAN_AND_ORG)])
+		}
+		return nil
+	}
+
 	if m.IsDataMsg() {
 		if m.Tag != GossipMessage_CHAN_AND_ORG {
 			return fmt.Errorf("Tag should be %s", GossipMessage_Tag_name[int32(GossipMessage_CHAN_AND_ORG)])
