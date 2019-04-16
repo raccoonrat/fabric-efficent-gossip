@@ -208,7 +208,7 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 	}, gc.GetConf().BlockExpirationInterval, nil, nil, func(m interface{}) {
 		gc.blocksPuller.Remove(seqNumFromMsg(m))
 	})
-	gc.advMsgStore = msgstore.NewMessageStoreExpirable(comparator, nil, gc.GetConf().BlockExpirationInterval, nil, nil, nil)
+	gc.advMsgStore = msgstore.NewMessageStoreExpirable(comparator, msgstore.Noop, gc.GetConf().BlockExpirationInterval, nil, nil, msgstore.Noop)
 
 	hashPeerExpiredInMembership := func(o interface{}) bool {
 		pkiID := o.(*proto.SignedGossipMessage).GetStateInfo().PkiId
