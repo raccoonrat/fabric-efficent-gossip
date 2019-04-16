@@ -92,16 +92,16 @@ func (p *batchingEmitterImpl) emit() {
 		return
 	}
 
-	p.decrementCounters()
-
 	msgs2bePushed := make([]interface{}, 0)
 	msgs2beAdvertised := make([]interface{}, 0)
 	for _, v := range p.buff {
 		if *v.pushesLeft != 0 {
+			*v.pushesLeft--
 			msgs2bePushed = append(msgs2bePushed, v.data)
 			continue
 		}
 		if *v.advertisesLeft != 0 {
+			*v.advertisesLeft--
 			emsg := v.data.(*gossip.EmittedGossipMessage)
 			nonce := p.newNONCE()
 			msg := &gossip.GossipMessage{
@@ -154,18 +154,6 @@ func (p *batchingEmitterImpl) emit() {
 	p.cb(msgs2bePushed)
 	p.cb(msgs2beAdvertised)
 	p.updateBuffer()
-}
-
-func (p *batchingEmitterImpl) decrementCounters() {
-	n := len(p.buff)
-	for i := 0; i < n; i++ {
-		msg := p.buff[i]
-		if *msg.pushesLeft != 0 {
-			*msg.pushesLeft--
-			continue
-		}
-		*msg.advertisesLeft--
-	}
 }
 
 func (p *batchingEmitterImpl) updateBuffer() {
