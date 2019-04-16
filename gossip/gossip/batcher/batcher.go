@@ -96,6 +96,7 @@ func (p *batchingEmitterImpl) emit() {
 	for _, v := range p.buff {
 		if *v.pushesLeft != 0 {
 			msgs2bePushed = append(msgs2bePushed, v.data)
+			continue
 		}
 		if *v.advertisesLeft != 0 {
 			emsg := v.data.(*gossip.EmittedGossipMessage)
@@ -143,6 +144,7 @@ func (p *batchingEmitterImpl) emit() {
 				delete(p.nonces, nonce)
 				p.mapLock.Unlock()
 			})
+			continue
 		}
 	}
 
