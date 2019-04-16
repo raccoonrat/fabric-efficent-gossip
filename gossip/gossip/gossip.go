@@ -108,6 +108,7 @@ type Config struct {
 	PropagateIterations int      // Number of times a message is pushed to remote peers
 	PushTtl             int      // Number of times a block is pushed to remote peers
 	AdvTtl              int      // Number of times a block is advertised to remote peers
+	BlocksPeerNum       int      // Number of peers selected to push blocks to
 	PropagatePeerNum    int      // Number of peers selected to push messages to
 
 	MaxBlockCountToStore int // Maximum count of blocks we store in memory

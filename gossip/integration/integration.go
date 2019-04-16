@@ -44,6 +44,7 @@ func newConfig(selfEndpoint string, externalEndpoint string, certs *common.TLSCe
 		PropagateIterations:        util.GetIntOrDefault("peer.gossip.propagateIterations", 1),
 		PushTtl:                    util.GetIntOrDefault("peer.gossip.pushTtl", 1),
 		AdvTtl:                     util.GetIntOrDefault("peer.gossip.advTtl", 0),
+		BlocksPeerNum:              util.GetIntOrDefault("peer.gossip.blockPeerNum", 3),
 		PropagatePeerNum:           util.GetIntOrDefault("peer.gossip.propagatePeerNum", 3),
 		PullInterval:               util.GetDurationOrDefault("peer.gossip.pullInterval", 4*time.Second),
 		PullPeerNum:                util.GetIntOrDefault("peer.gossip.pullPeerNum", 3),
