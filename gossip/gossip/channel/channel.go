@@ -204,9 +204,13 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 		return fmt.Sprintf("%d", m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum)
 	}
 	gc.blockMsgStore = msgstore.NewMessageStoreExpirable(comparator, func(m interface{}) {
-		gc.blocksPuller.Remove(seqNumFromMsg(m))
+		if m.(*proto.SignedGossipMessage).IsDataMsg() {
+			gc.blocksPuller.Remove(seqNumFromMsg(m))
+		}
 	}, gc.GetConf().BlockExpirationInterval, nil, nil, func(m interface{}) {
-		gc.blocksPuller.Remove(seqNumFromMsg(m))
+		if m.(*proto.SignedGossipMessage).IsDataMsg() {
+			gc.blocksPuller.Remove(seqNumFromMsg(m))
+		}
 	})
 	gc.advMsgStore = msgstore.NewMessageStoreExpirable(comparator, msgstore.Noop, gc.GetConf().BlockExpirationInterval, nil, nil, msgstore.Noop)
 
