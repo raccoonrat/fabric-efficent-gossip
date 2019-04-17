@@ -163,8 +163,8 @@ peer:
         # Number of peers selected to push messages to
         blockPeerNum: 4
         propagatePeerNum: 3
-        pushTtl: 3
-        advTtl: 3
+        pushTtl: 2
+        advTtl: 7
         # Determines frequency of pull phases(unit: second)
         # Must be greater than digestWaitTime + responseWaitTime
         pullInterval: 4s
