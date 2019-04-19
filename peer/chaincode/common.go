@@ -336,7 +336,7 @@ func validatePeerConnectionParameters(cmdName string) error {
 
 	if viper.GetBool("peer.tls.enabled") {
 		if len(tlsRootCertFiles) != len(peerAddresses) {
-			return errors.Errorf("number of peer addresses (%d) does not match the number of TLS root cert files (%d)", len(peerAddresses), len(tlsRootCertFiles))
+			return errors.Errorf("number of peer addresses (%d) %v does not match the number of TLS root cert files (%d) %v", len(peerAddresses), peerAddresses, len(tlsRootCertFiles), tlsRootCertFiles)
 		}
 	} else {
 		tlsRootCertFiles = nil
