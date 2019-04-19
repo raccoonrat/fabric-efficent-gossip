@@ -316,8 +316,10 @@ func validatePeerConnectionParameters(cmdName string) error {
 					if !ok {
 						return errors.Errorf("peer '%s' is defined in the channel config but doesn't have associated peer config", peer)
 					}
+					logger.Critical(peerAddresses, tlsRootCertFiles)
 					peerAddresses = append(peerAddresses, peerConfig.URL)
 					tlsRootCertFiles = append(tlsRootCertFiles, peerConfig.TLSCACerts.Path)
+					logger.Critical(peerAddresses, tlsRootCertFiles)
 				}
 			}
 		}
