@@ -302,6 +302,8 @@ func checkChaincodeCmdParams(cmd *cobra.Command) error {
 }
 
 func validatePeerConnectionParameters(cmdName string) error {
+	logger.Critical("[Crit] test func")
+	fmt.Print("[Print] test func")
 	if connectionProfile != common.UndefinedParamValue {
 		networkConfig, err := common.GetConfig(connectionProfile)
 		if err != nil {
@@ -316,10 +318,10 @@ func validatePeerConnectionParameters(cmdName string) error {
 					if !ok {
 						return errors.Errorf("peer '%s' is defined in the channel config but doesn't have associated peer config", peer)
 					}
-					logger.Critical(peerAddresses, tlsRootCertFiles)
+					fmt.Print(peerAddresses, tlsRootCertFiles)
 					peerAddresses = append(peerAddresses, peerConfig.URL)
 					tlsRootCertFiles = append(tlsRootCertFiles, peerConfig.TLSCACerts.Path)
-					logger.Critical(peerAddresses, tlsRootCertFiles)
+					fmt.Print(peerAddresses, tlsRootCertFiles)
 				}
 			}
 		}
