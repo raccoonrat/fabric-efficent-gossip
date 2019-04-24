@@ -75,10 +75,12 @@ func (p *batchingEmitterImpl) periodicEmit() {
 }
 
 func (p *batchingEmitterImpl) newNONCE() uint64 {
+	p.mapLock.Lock()
 	n := uint64(0)
 	for {
 		n = util.RandomUInt64()
 		if _, ok := p.nonces[n]; !ok {
+			p.mapLock.Unlock()
 			return n
 		}
 	}
