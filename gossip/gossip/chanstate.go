@@ -93,7 +93,7 @@ func (cs *channelState) getGossipChannelByChainID(chainID common.ChainID) channe
 	return cs.channels[string(chainID)]
 }
 
-func (cs *channelState) joinChannel(joinMsg api.JoinChannelMessage, chainID common.ChainID) {
+func (cs *channelState) joinChannel(joinMsg api.JoinChannelMessage, chainID common.ChainID, cb func([]interface{})) {
 	if cs.isStopping() {
 		return
 	}
@@ -102,7 +102,7 @@ func (cs *channelState) joinChannel(joinMsg api.JoinChannelMessage, chainID comm
 	if gc, exists := cs.channels[string(chainID)]; !exists {
 		pkiID := cs.g.comm.GetPKIid()
 		ga := &gossipAdapterImpl{gossipServiceImpl: cs.g, Discovery: cs.g.disc}
-		gc := channel.NewGossipChannel(pkiID, cs.g.selfOrg, cs.g.mcs, chainID, ga, joinMsg)
+		gc := channel.NewGossipChannel(pkiID, cs.g.selfOrg, cs.g.mcs, chainID, ga, joinMsg, cb)
 		cs.channels[string(chainID)] = gc
 	} else {
 		gc.ConfigureChannel(joinMsg)
@@ -146,7 +146,7 @@ func (ga *gossipAdapterImpl) Sign(msg *proto.GossipMessage) (*proto.SignedGossip
 
 // Gossip gossips a message
 func (ga *gossipAdapterImpl) Gossip(msg *proto.SignedGossipMessage) {
-	ga.gossipServiceImpl.emitter.Add(&EmittedGossipMessage{
+	ga.gossipServiceImpl.emitter.Add(&proto.EmittedGossipMessage{
 		SignedGossipMessage: msg,
 		Filter: func(_ common.PKIidType) bool {
 			return true
@@ -156,7 +156,7 @@ func (ga *gossipAdapterImpl) Gossip(msg *proto.SignedGossipMessage) {
 
 // Forward sends message to the next hops
 func (ga *gossipAdapterImpl) Forward(msg proto.ReceivedMessage) {
-	ga.gossipServiceImpl.emitter.Add(&EmittedGossipMessage{
+	ga.gossipServiceImpl.emitter.Add(&proto.EmittedGossipMessage{
 		SignedGossipMessage: msg.GetGossipMessage(),
 		Filter:              msg.GetConnectionInfo().ID.IsNotSameFilter,
 	})
