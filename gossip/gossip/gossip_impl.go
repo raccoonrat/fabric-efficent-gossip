@@ -345,6 +345,33 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	msg := m.GetGossipMessage()
 
 	g.logger.Debug("Entering,", m.GetConnectionInfo(), "sent us", msg)
+	if msg.IsDataMsg() {
+		g.logger.Criticalf("Received pushed block #%d-%d-%d from %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, m.GetConnectionInfo().ID)
+	}
+	if msg.IsAdvertiseMessage() {
+		g.logger.Criticalf("Received advertise msg #%d %d from %v", msg.GetAdvMsg().SeqNum, msg.GetAdvMsg().Nonce, m.GetConnectionInfo().ID)
+	}
+	if msg.IsRequestMessage() {
+		g.logger.Criticalf("Received request msg %d from %v", msg.GetReqMsg().Nonce, m.GetConnectionInfo().ID)
+	}
+	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
+		if msg.IsDataUpdate() {
+			type pulledMessage struct {
+				seq_num  uint64
+				push_ttl int32
+				pull_ttl int32
+			}
+			var blocks []pulledMessage
+			blocks = make([]pulledMessage, len(msg.GetDataUpdate().Data))
+			for i, pulledMsg := range msg.GetDataUpdate().Data {
+				dataMsg, _ := pulledMsg.ToGossipMessage()
+				blocks[i].seq_num = dataMsg.GetDataMsg().Payload.SeqNum
+				blocks[i].push_ttl = dataMsg.GetDataMsg().PushTtl
+				blocks[i].pull_ttl = dataMsg.GetDataMsg().AdvTtl
+			}
+			g.logger.Criticalf("Received pulled blocks %v from %v", blocks, m.GetConnectionInfo().ID)
+		}
+	}
 	defer g.logger.Debug("Exiting")
 
 	if !g.validateMsg(m) {
