@@ -85,9 +85,9 @@ type Gossip interface {
 	Stop()
 }
 
-// emittedGossipMessage encapsulates signed gossip message to compose
+// EmittedGossipMessage encapsulates signed gossip message to compose
 // with routing filter to be used while message is forwarded
-type emittedGossipMessage struct {
+type EmittedGossipMessage struct {
 	*proto.SignedGossipMessage
 	filter func(id common.PKIidType) bool
 }
