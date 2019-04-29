@@ -21,6 +21,7 @@ import (
 	gossip_proto "github.com/hyperledger/fabric/protos/gossip"
 	"github.com/hyperledger/fabric/protos/orderer"
 	"github.com/op/go-logging"
+	"github.com/spf13/viper"
 )
 
 // LedgerInfo an adapter to provide the interface to query
@@ -190,7 +191,7 @@ func (b *blocksProviderImpl) DeliverBlocks() {
 			}
 
 			// Gossip messages with other nodes
-			logger.Debugf("[%s] Gossiping block [%d], peers number [%d]", b.chainID, blockNum, numberOfPeers)
+			logger.Criticalf("[%s] Gossiping block [%d] of size [%d], peers number [%d]", b.chainID, blockNum, len(gossipMsg.GetDataMsg().Payload.Data), numberOfPeers)
 			if !b.isDone() {
 				b.gossip.Gossip(gossipMsg)
 			}
@@ -249,6 +250,8 @@ func createGossipMsg(chainID string, payload *gossip_proto.Payload) *gossip_prot
 		Content: &gossip_proto.GossipMessage_DataMsg{
 			DataMsg: &gossip_proto.DataMessage{
 				Payload: payload,
+				PushTtl: int32(viper.Get("peer.gossip.pushTtl").(int)),
+				AdvTtl:  int32(viper.Get("peer.gossip.advTtl").(int)),
 			},
 		},
 	}
