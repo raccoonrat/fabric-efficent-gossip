@@ -658,6 +658,12 @@ func (s *GossipStateProviderImpl) requestBlocksInRange(start uint64, end uint64)
 				if msg.GetGossipMessage().Nonce != gossipMsg.Nonce {
 					continue
 				}
+				var blocks []uint64
+				blocks = make([]uint64, len(msg.GetGossipMessage().GetStateResponse().Payloads))
+				for i, dataMsg := range msg.GetGossipMessage().GetStateResponse().Payloads {
+					blocks[i] = dataMsg.SeqNum
+				}
+				logger.Criticalf("Received synced blocks %v from %v", blocks, msg.GetConnectionInfo().ID)
 				// Got corresponding response for state request, can continue
 				index, err := s.handleStateResponse(msg)
 				if err != nil {
