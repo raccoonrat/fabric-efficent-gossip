@@ -4,7 +4,7 @@ Copyright IBM Corp. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package gossip
+package batcher
 
 import (
 	"sync"
@@ -16,10 +16,10 @@ import (
 
 type emitBatchCallback func([]interface{})
 
-//batchingEmitter is used for the gossip push/forwarding phase.
-// Messages are added into the batchingEmitter, and they are forwarded periodically T times in batches and then discarded.
-// If the batchingEmitter's stored message count reaches a certain capacity, that also triggers a message dispatch
-type batchingEmitter interface {
+//BatchingEmitter is used for the gossip push/forwarding phase.
+// Messages are added into the BatchingEmitter, and they are forwarded periodically T times in batches and then discarded.
+// If the BatchingEmitter's stored message count reaches a certain capacity, that also triggers a message dispatch
+type BatchingEmitter interface {
 	// Add adds a message to be batched
 	Add(interface{})
 
@@ -35,7 +35,7 @@ type batchingEmitter interface {
 // burstSize: a threshold that triggers a forwarding because of message count
 // latency: the maximum delay that each message can be stored without being forwarded
 // cb: a callback that is called in order for the forwarding to take place
-func newBatchingEmitter(iterations, burstSize int, latency time.Duration, cb emitBatchCallback) batchingEmitter {
+func NewBatchingEmitter(iterations, burstSize int, latency time.Duration, cb emitBatchCallback) BatchingEmitter {
 	if iterations < 0 {
 		panic(errors.Errorf("Got a negative iterations number"))
 	}

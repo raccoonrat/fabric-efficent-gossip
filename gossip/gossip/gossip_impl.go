@@ -19,6 +19,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/discovery"
 	"github.com/hyperledger/fabric/gossip/filter"
+	"github.com/hyperledger/fabric/gossip/gossip/batcher"
 	"github.com/hyperledger/fabric/gossip/gossip/channel"
 	"github.com/hyperledger/fabric/gossip/gossip/msgstore"
 	"github.com/hyperledger/fabric/gossip/gossip/pull"
@@ -53,7 +54,7 @@ type gossipServiceImpl struct {
 	conf              *Config
 	toDieChan         chan struct{}
 	stopFlag          int32
-	emitter           batchingEmitter
+	emitter           batcher.BatchingEmitter
 	discAdapter       *discoveryAdapter
 	secAdvisor        api.SecurityAdvisor
 	chanState         *channelState
@@ -105,7 +106,7 @@ func NewGossipService(conf *Config, s *grpc.Server, sa api.SecurityAdvisor,
 	}
 
 	g.chanState = newChannelState(g)
-	g.emitter = newBatchingEmitter(conf.PropagateIterations,
+	g.emitter = batcher.NewBatchingEmitter(conf.PropagateIterations,
 		conf.MaxPropagationBurstSize, conf.MaxPropagationBurstLatency,
 		g.sendGossipBatch)
 
