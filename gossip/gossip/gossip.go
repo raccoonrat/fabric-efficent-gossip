@@ -85,13 +85,6 @@ type Gossip interface {
 	Stop()
 }
 
-// EmittedGossipMessage encapsulates signed gossip message to compose
-// with routing Filter to be used while message is forwarded
-type EmittedGossipMessage struct {
-	*proto.SignedGossipMessage
-	Filter func(id common.PKIidType) bool
-}
-
 // SendCriteria defines how to send a specific message
 type SendCriteria struct {
 	Timeout    time.Duration        // Timeout defines the time to wait for acknowledgements

@@ -689,3 +689,10 @@ func abs(a, b uint64) uint64 {
 	}
 	return b - a
 }
+
+// EmittedGossipMessage encapsulates signed gossip message to compose
+// with routing Filter to be used while message is forwarded
+type EmittedGossipMessage struct {
+	*SignedGossipMessage
+	Filter func(id common.PKIidType) bool
+}
