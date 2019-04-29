@@ -139,6 +139,9 @@ type gossipChannel struct {
 	stateInfoMsg              *proto.SignedGossipMessage
 	orgs                      []api.OrgIdentityType
 	joinMsg                   api.JoinChannelMessage
+	cb                        func([]interface{})
+	mapLock                   *sync.Mutex
+	nonces                    map[uint64]*proto.GossipMessage
 	blockMsgStore             msgstore.MessageStore
 	stateInfoMsgStore         *stateInfoCache
 	leaderMsgStore            msgstore.MessageStore
@@ -174,7 +177,7 @@ func (mf *membershipFilter) GetMembership() []discovery.NetworkMember {
 
 // NewGossipChannel creates a new GossipChannel
 func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.MessageCryptoService,
-	chainID common.ChainID, adapter Adapter, joinMsg api.JoinChannelMessage) GossipChannel {
+	chainID common.ChainID, adapter Adapter, joinMsg api.JoinChannelMessage, cb func([]interface{})) GossipChannel {
 	gc := &gossipChannel{
 		incTime:                   uint64(time.Now().UnixNano()),
 		selfOrg:                   org,
@@ -188,6 +191,9 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 		stateInfoRequestScheduler: time.NewTicker(adapter.GetConf().RequestStateInfoInterval),
 		orgs:    []api.OrgIdentityType{},
 		chainID: chainID,
+		mapLock: &sync.Mutex{},
+		nonces:  make(map[uint64]*proto.GossipMessage),
+		cb:      cb,
 	}
 
 	gc.memFilter = &membershipFilter{adapter: gc.Adapter, gossipChannel: gc}
@@ -200,9 +206,13 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 		return fmt.Sprintf("%d", m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum)
 	}
 	gc.blockMsgStore = msgstore.NewMessageStoreExpirable(comparator, func(m interface{}) {
-		gc.blocksPuller.Remove(seqNumFromMsg(m))
+		if m.(*proto.SignedGossipMessage).IsDataMsg() {
+			gc.blocksPuller.Remove(seqNumFromMsg(m))
+		}
 	}, gc.GetConf().BlockExpirationInterval, nil, nil, func(m interface{}) {
-		gc.blocksPuller.Remove(seqNumFromMsg(m))
+		if m.(*proto.SignedGossipMessage).IsDataMsg() {
+			gc.blocksPuller.Remove(seqNumFromMsg(m))
+		}
 	})
 
 	hashPeerExpiredInMembership := func(o interface{}) bool {
@@ -378,7 +388,7 @@ func (gc *gossipChannel) createBlockPuller() pull.Mediator {
 		MsgType:           proto.PullMsgType_BLOCK_MSG,
 		Channel:           []byte(gc.chainID),
 		ID:                gc.GetConf().ID,
-		PeerCountToSelect: gc.GetConf().PullPeerNum,
+		PeerCountToSelect: 0,
 		PullInterval:      gc.GetConf().PullInterval,
 		Tag:               proto.GossipMessage_CHAN_AND_ORG,
 	}
@@ -492,6 +502,16 @@ func (gc *gossipChannel) AddToMsgStore(msg *proto.SignedGossipMessage) {
 	}
 }
 
+func (gc *gossipChannel) newNONCE() uint64 {
+	n := uint64(0)
+	for {
+		n = util.RandomUInt64()
+		if _, ok := gc.nonces[n]; !ok {
+			return n
+		}
+	}
+}
+
 // ConfigureChannel (re)configures the list of organizations
 // that are eligible to be in the channel
 func (gc *gossipChannel) ConfigureChannel(joinMsg api.JoinChannelMessage) {
@@ -549,6 +569,33 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 		return
 	}
 
+	if m.IsAdvertiseMessage() {
+		if gc.ledgerHeight <= m.GetAdvMsg().SeqNum {
+			if gc.blockMsgStore.Add(msg.GetGossipMessage()) {
+				reqMsg := &proto.GossipMessage{
+					Channel: msg.GetGossipMessage().Channel,
+					Tag:     msg.GetGossipMessage().Tag,
+					Nonce:   0,
+					Content: &proto.GossipMessage_ReqMsg{
+						ReqMsg: &proto.RequestMessage{
+							Nonce: msg.GetGossipMessage().GetAdvMsg().Nonce,
+						},
+					},
+				}
+				msg.Respond(reqMsg)
+			}
+		}
+	}
+
+	if m.IsRequestMessage() {
+		gc.mapLock.Lock()
+		resp, ok := gc.nonces[m.GetReqMsg().Nonce]
+		gc.mapLock.Unlock()
+		if ok {
+			msg.Respond(resp)
+		}
+	}
+
 	if m.IsDataMsg() || m.IsStateInfoMsg() {
 		added := false
 
@@ -571,15 +618,61 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 			added = gc.stateInfoMsgStore.Add(msg.GetGossipMessage())
 		}
 
-		if added {
+		if m.IsDataMsg() {
+			if m.GetDataMsg().PushTtl > 0 {
+				m.GetDataMsg().PushTtl -= 1
+				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
+				gc.Forward(msg)
+			} else if m.GetDataMsg().AdvTtl > 0 {
+				m.GetDataMsg().AdvTtl -= 1
+				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
+				gc.mapLock.Lock()
+				nonce := gc.newNONCE()
+				gc.nonces[nonce] = m.GossipMessage
+				gc.mapLock.Unlock()
+				time.AfterFunc(time.Duration(1000)*time.Millisecond, func() {
+					gc.mapLock.Lock()
+					delete(gc.nonces, nonce)
+					gc.mapLock.Unlock()
+				})
+
+				msgs := make([]interface{}, 1)
+				msgs[0] = &proto.EmittedGossipMessage{
+					SignedGossipMessage: &proto.SignedGossipMessage{
+						Envelope: nil,
+						GossipMessage: &proto.GossipMessage{
+							Nonce:   0,
+							Tag:     proto.GossipMessage_CHAN_AND_ORG,
+							Channel: m.Channel,
+							Content: &proto.GossipMessage_AdvMsg{
+								AdvMsg: &proto.AdvertiseMessage{
+									Nonce:  nonce,
+									SeqNum: m.GetDataMsg().Payload.SeqNum,
+								},
+							},
+						},
+					},
+					Filter: func(_ common.PKIidType) bool {
+						return true
+					},
+				}
+				gc.cb(msgs)
+			}
+
+			// Forward the message
+			if added {
+				// DeMultiplex to local subscribers
+				gc.DeMultiplex(m)
+
+				gc.blocksPuller.Add(msg.GetGossipMessage())
+			}
+		}
+
+		if added && m.IsStateInfoMsg() {
 			// Forward the message
 			gc.Forward(msg)
 			// DeMultiplex to local subscribers
 			gc.DeMultiplex(m)
-
-			if m.IsDataMsg() {
-				gc.blocksPuller.Add(msg.GetGossipMessage())
-			}
 		}
 		return
 	}
