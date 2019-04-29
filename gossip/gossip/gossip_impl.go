@@ -483,6 +483,7 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*emittedGossipMessage) {
 		return
 	}
 
+	var advertiseMsgs []*emittedGossipMessage
 	var blocks []*emittedGossipMessage
 	var stateInfoMsgs []*emittedGossipMessage
 	var orgMsgs []*emittedGossipMessage
@@ -508,18 +509,26 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*emittedGossipMessage) {
 	isLeadershipMsg := func(o interface{}) bool {
 		return o.(*emittedGossipMessage).IsLeadershipMsg()
 	}
+	isAdvertise := func(o interface{}) bool {
+		return o.(*emittedGossipMessage).IsAdvertiseMessage()
+	}
 
 	// Gossip blocks
 	blocks, msgs = partitionMessages(isABlock, msgs)
 	g.gossipInChan(blocks, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
-	})
+	}, g.conf.BlocksPeerNum)
+
+	advertiseMsgs, msgs = partitionMessages(isAdvertise, msgs)
+	g.gossipInChan(advertiseMsgs, func(gc channel.GossipChannel) filter.RoutingFilter {
+		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
+	}, g.conf.BlocksPeerNum)
 
 	// Gossip Leadership messages
 	leadershipMsgs, msgs = partitionMessages(isLeadershipMsg, msgs)
 	g.gossipInChan(leadershipMsgs, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
-	})
+	}, g.conf.PropagatePeerNum)
 
 	// Gossip StateInfo messages
 	stateInfoMsgs, msgs = partitionMessages(isAStateInfoMsg, msgs)
@@ -578,7 +587,7 @@ func (g *gossipServiceImpl) sendAndFilterSecrets(msg *proto.SignedGossipMessage,
 }
 
 // gossipInChan gossips a given GossipMessage slice according to a channel's routing policy.
-func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory) {
+func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory, peers int) {
 	if len(messages) == 0 {
 		return
 	}
@@ -609,7 +618,7 @@ func (g *gossipServiceImpl) gossipInChan(messages []*emittedGossipMessage, chanR
 		if messagesOfChannel[0].IsLeadershipMsg() {
 			peers2Send = filter.SelectPeers(len(membership), membership, chanRoutingFactory(gc))
 		} else {
-			peers2Send = filter.SelectPeers(g.conf.PropagatePeerNum, membership, chanRoutingFactory(gc))
+			peers2Send = filter.SelectPeers(peers, membership, chanRoutingFactory(gc))
 		}
 
 		// Send the messages to the remote peers
