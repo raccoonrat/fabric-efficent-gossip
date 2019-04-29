@@ -388,7 +388,7 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 				if g.stateInfoMsgStore.Add(msg) {
 					g.emitter.Add(&EmittedGossipMessage{
 						SignedGossipMessage: msg,
-						filter:              m.GetConnectionInfo().ID.IsNotSameFilter,
+						Filter:              m.GetConnectionInfo().ID.IsNotSameFilter,
 					})
 				}
 			}
@@ -541,7 +541,7 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*EmittedGossipMessage) {
 		}
 
 		peerSelector = filter.CombineRoutingFilters(peerSelector, func(member discovery.NetworkMember) bool {
-			return stateInfMsg.filter(member.PKIid)
+			return stateInfMsg.Filter(member.PKIid)
 		})
 
 		peers2Send := filter.SelectPeers(g.conf.PropagatePeerNum, g.disc.GetMembership(), peerSelector)
@@ -563,7 +563,7 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*EmittedGossipMessage) {
 		}
 		selectByOriginOrg := g.peersByOriginOrgPolicy(discovery.NetworkMember{PKIid: msg.GetAliveMsg().Membership.PkiId})
 		selector := filter.CombineRoutingFilters(selectByOriginOrg, func(member discovery.NetworkMember) bool {
-			return msg.filter(member.PKIid)
+			return msg.Filter(member.PKIid)
 		})
 		peers2Send := filter.SelectPeers(g.conf.PropagatePeerNum, g.disc.GetMembership(), selector)
 		g.sendAndFilterSecrets(msg.SignedGossipMessage, peers2Send...)
@@ -634,7 +634,7 @@ func (g *gossipServiceImpl) gossipInChan(messages []*EmittedGossipMessage, chanR
 func (g *gossipServiceImpl) removeSelfLoop(msg *EmittedGossipMessage, peers []*comm.RemotePeer) []*comm.RemotePeer {
 	var result []*comm.RemotePeer
 	for _, peer := range peers {
-		if msg.filter(peer.PKIID) {
+		if msg.Filter(peer.PKIID) {
 			result = append(result, peer)
 		}
 	}
@@ -731,7 +731,7 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 	}
 	g.emitter.Add(&EmittedGossipMessage{
 		SignedGossipMessage: sMsg,
-		filter: func(_ common.PKIidType) bool {
+		Filter: func(_ common.PKIidType) bool {
 			return true
 		},
 	})
@@ -901,7 +901,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 			}
 			g.emitter.Add(&EmittedGossipMessage{
 				SignedGossipMessage: msg,
-				filter: func(_ common.PKIidType) bool {
+				Filter: func(_ common.PKIidType) bool {
 					return true
 				},
 			})
@@ -912,7 +912,7 @@ func (g *gossipServiceImpl) newDiscoveryAdapter() *discoveryAdapter {
 			}
 			g.emitter.Add(&EmittedGossipMessage{
 				SignedGossipMessage: message.GetGossipMessage(),
-				filter:              message.GetConnectionInfo().ID.IsNotSameFilter,
+				Filter:              message.GetConnectionInfo().ID.IsNotSameFilter,
 			})
 		},
 		incChan:          make(chan proto.ReceivedMessage),

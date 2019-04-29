@@ -1229,7 +1229,7 @@ func TestSendByCriteria(t *testing.T) {
 
 	// We try to send to either g2 or g3, but neither would ack us, so we would fail.
 	// However - what we actually check in this test is that we send to peers according to the
-	// filter passed in the criteria
+	// Filter passed in the criteria
 	failOnAckRequest := func(c <-chan proto.ReceivedMessage, peerId int) {
 		msg := <-c
 		if msg == nil {

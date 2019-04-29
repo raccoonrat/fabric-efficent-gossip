@@ -86,10 +86,10 @@ type Gossip interface {
 }
 
 // EmittedGossipMessage encapsulates signed gossip message to compose
-// with routing filter to be used while message is forwarded
+// with routing Filter to be used while message is forwarded
 type EmittedGossipMessage struct {
 	*proto.SignedGossipMessage
-	filter func(id common.PKIidType) bool
+	Filter func(id common.PKIidType) bool
 }
 
 // SendCriteria defines how to send a specific message
