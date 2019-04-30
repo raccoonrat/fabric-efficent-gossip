@@ -624,7 +624,7 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 
 			if m.GetDataMsg().Payload != nil {
 				gc.mapLock.Lock()
-				if _, ok := gc.blocks[m.GetDataMsg().Payload.SeqNum]; !ok {
+				if payload, ok := gc.blocks[m.GetDataMsg().Payload.SeqNum]; !ok || payload == nil {
 					gc.blocks[m.GetDataMsg().Block] = m.GetDataMsg().Payload
 				}
 				gc.mapLock.Unlock()
@@ -646,6 +646,9 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 				_, ok := gc.blocks[m.GetDataMsg().Block]
 				gc.mapLock.Unlock()
 				if !ok {
+					gc.mapLock.Lock()
+					gc.blocks[m.GetDataMsg().Block] = nil
+					gc.mapLock.Unlock()
 					resp := &proto.GossipMessage{
 						Nonce:   0,
 						Tag:     proto.GossipMessage_CHAN_AND_ORG,
