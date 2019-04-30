@@ -592,9 +592,26 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 	}
 
 	if m.IsDataMsg() || m.IsStateInfoMsg() {
+		var m_cpy *proto.SignedGossipMessage
 		added := false
 
 		if m.IsDataMsg() {
+			m_cpy = &proto.SignedGossipMessage{
+				Envelope: nil,
+				GossipMessage: &proto.GossipMessage{
+					Tag:     m.Tag,
+					Channel: m.Channel,
+					Content: &proto.GossipMessage_DataMsg{
+						DataMsg: &proto.DataMessage{
+							Block:   m.GetDataMsg().Block,
+							PushTtl: m.GetDataMsg().PushTtl,
+							AdvTtl:  m.GetDataMsg().AdvTtl,
+							Payload: m.GetDataMsg().Payload,
+						},
+					},
+				},
+			}
+
 			if m.GetDataMsg().Payload != nil {
 				gc.mapLock.Lock()
 				if _, ok := gc.blocks[m.GetDataMsg().Payload.SeqNum]; !ok {
@@ -613,7 +630,7 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 					gc.logger.Warning("Failed verifying block", m.GetDataMsg().Payload.SeqNum)
 					return
 				}
-				added = gc.blockMsgStore.Add(msg.GetGossipMessage())
+				added = gc.blockMsgStore.Add(m_cpy)
 			} else {
 				gc.mapLock.Lock()
 				_, ok := gc.blocks[m.GetDataMsg().Block]
@@ -641,30 +658,12 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 		}
 
 		if m.IsDataMsg() {
-			var m_cpy *proto.SignedGossipMessage
-
-			m_cpy = m
 			if m.GetDataMsg().PushTtl > 0 {
 				m.GetDataMsg().PushTtl -= 1
 				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
 				gc.Forward(msg)
 			} else if m.GetDataMsg().AdvTtl > 0 {
 				m.GetDataMsg().AdvTtl -= 1
-				m_cpy = &proto.SignedGossipMessage{
-					Envelope: nil,
-					GossipMessage: &proto.GossipMessage{
-						Tag:     m.Tag,
-						Channel: m.Channel,
-						Content: &proto.GossipMessage_DataMsg{
-							DataMsg: &proto.DataMessage{
-								Block:   m.GetDataMsg().Block,
-								PushTtl: m.GetDataMsg().PushTtl,
-								AdvTtl:  m.GetDataMsg().AdvTtl,
-								Payload: m.GetDataMsg().Payload,
-							},
-						},
-					},
-				}
 				m.GetDataMsg().Payload = nil
 				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
 				gc.Forward(msg)
