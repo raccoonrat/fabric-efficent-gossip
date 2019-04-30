@@ -671,6 +671,7 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 
 			// Forward the message
 			if added {
+				gc.logger.Criticalf("Received pushed block #%d-%d-%d from %v", m.GetDataMsg().Block, m.GetDataMsg().PushTtl, m.GetDataMsg().AdvTtl, msg.GetConnectionInfo().ID)
 				// DeMultiplex to local subscribers
 				gc.DeMultiplex(m_cpy)
 
