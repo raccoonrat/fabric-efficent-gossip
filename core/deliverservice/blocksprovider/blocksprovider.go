@@ -249,6 +249,7 @@ func createGossipMsg(chainID string, payload *gossip_proto.Payload) *gossip_prot
 		Channel: []byte(chainID),
 		Content: &gossip_proto.GossipMessage_DataMsg{
 			DataMsg: &gossip_proto.DataMessage{
+				Block:   payload.SeqNum,
 				Payload: payload,
 				PushTtl: int32(viper.Get("peer.gossip.pushTtl").(int)),
 				AdvTtl:  int32(viper.Get("peer.gossip.advTtl").(int)),

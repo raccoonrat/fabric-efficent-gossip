@@ -141,7 +141,7 @@ type gossipChannel struct {
 	joinMsg                   api.JoinChannelMessage
 	cb                        func([]interface{})
 	mapLock                   *sync.Mutex
-	nonces                    map[uint64]*proto.GossipMessage
+	blocks                    map[uint64]*proto.Payload
 	blockMsgStore             msgstore.MessageStore
 	stateInfoMsgStore         *stateInfoCache
 	leaderMsgStore            msgstore.MessageStore
@@ -192,7 +192,7 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 		orgs:    []api.OrgIdentityType{},
 		chainID: chainID,
 		mapLock: &sync.Mutex{},
-		nonces:  make(map[uint64]*proto.GossipMessage),
+		blocks:  make(map[uint64]*proto.Payload),
 		cb:      cb,
 	}
 
@@ -208,10 +208,20 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 	gc.blockMsgStore = msgstore.NewMessageStoreExpirable(comparator, func(m interface{}) {
 		if m.(*proto.SignedGossipMessage).IsDataMsg() {
 			gc.blocksPuller.Remove(seqNumFromMsg(m))
+			if _, ok := gc.blocks[m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum]; ok {
+				gc.mapLock.Lock()
+				delete(gc.blocks, m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum)
+				gc.mapLock.Unlock()
+			}
 		}
 	}, gc.GetConf().BlockExpirationInterval, nil, nil, func(m interface{}) {
 		if m.(*proto.SignedGossipMessage).IsDataMsg() {
 			gc.blocksPuller.Remove(seqNumFromMsg(m))
+			if _, ok := gc.blocks[m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum]; ok {
+				gc.mapLock.Lock()
+				delete(gc.blocks, m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum)
+				gc.mapLock.Unlock()
+			}
 		}
 	})
 
@@ -502,16 +512,6 @@ func (gc *gossipChannel) AddToMsgStore(msg *proto.SignedGossipMessage) {
 	}
 }
 
-func (gc *gossipChannel) newNONCE() uint64 {
-	n := uint64(0)
-	for {
-		n = util.RandomUInt64()
-		if _, ok := gc.nonces[n]; !ok {
-			return n
-		}
-	}
-}
-
 // ConfigureChannel (re)configures the list of organizations
 // that are eligible to be in the channel
 func (gc *gossipChannel) ConfigureChannel(joinMsg api.JoinChannelMessage) {
@@ -569,29 +569,24 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 		return
 	}
 
-	if m.IsAdvertiseMessage() {
-		if gc.ledgerHeight <= m.GetAdvMsg().SeqNum {
-			if gc.blockMsgStore.Add(msg.GetGossipMessage()) {
-				reqMsg := &proto.GossipMessage{
-					Channel: msg.GetGossipMessage().Channel,
-					Tag:     msg.GetGossipMessage().Tag,
-					Nonce:   0,
-					Content: &proto.GossipMessage_ReqMsg{
-						ReqMsg: &proto.RequestMessage{
-							Nonce: msg.GetGossipMessage().GetAdvMsg().Nonce,
-						},
-					},
-				}
-				msg.Respond(reqMsg)
-			}
-		}
-	}
-
 	if m.IsRequestMessage() {
 		gc.mapLock.Lock()
-		resp, ok := gc.nonces[m.GetReqMsg().Nonce]
+		respPayload, ok := gc.blocks[m.GetReqMsg().Block]
 		gc.mapLock.Unlock()
 		if ok {
+			resp := &proto.GossipMessage{
+				Nonce:   0,
+				Tag:     proto.GossipMessage_CHAN_AND_ORG,
+				Channel: m.Channel,
+				Content: &proto.GossipMessage_DataMsg{
+					DataMsg: &proto.DataMessage{
+						Block:   m.GetReqMsg().Block,
+						PushTtl: m.GetReqMsg().PushTtl,
+						AdvTtl:  m.GetReqMsg().AdvTtl,
+						Payload: respPayload,
+					},
+				},
+			}
 			msg.Respond(resp)
 		}
 	}
@@ -600,19 +595,46 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 		added := false
 
 		if m.IsDataMsg() {
-			if m.GetDataMsg().Payload == nil {
-				gc.logger.Warning("Payload is empty, got it from", msg.GetConnectionInfo().ID)
-				return
+			if m.GetDataMsg().Payload != nil {
+				gc.mapLock.Lock()
+				if _, ok := gc.blocks[m.GetDataMsg().Payload.SeqNum]; !ok {
+					gc.blocks[m.GetDataMsg().Block] = m.GetDataMsg().Payload
+				}
+				gc.mapLock.Unlock()
+				if m.GetDataMsg().Payload == nil {
+					gc.logger.Warning("Payload is empty, got it from", msg.GetConnectionInfo().ID)
+					return
+				}
+				// Would this block go into the message store if it was verified?
+				/*if !gc.blockMsgStore.CheckValid(msg.GetGossipMessage()) {
+				    return
+				}*/
+				if !gc.verifyBlock(m.GossipMessage, msg.GetConnectionInfo().ID) {
+					gc.logger.Warning("Failed verifying block", m.GetDataMsg().Payload.SeqNum)
+					return
+				}
+				added = gc.blockMsgStore.Add(msg.GetGossipMessage())
+			} else {
+				gc.mapLock.Lock()
+				_, ok := gc.blocks[m.GetDataMsg().Payload.SeqNum]
+				gc.mapLock.Unlock()
+				if !ok {
+					resp := &proto.GossipMessage{
+						Nonce:   0,
+						Tag:     proto.GossipMessage_CHAN_AND_ORG,
+						Channel: m.Channel,
+						Content: &proto.GossipMessage_ReqMsg{
+							ReqMsg: &proto.RequestMessage{
+								Block:   m.GetDataMsg().Block,
+								PushTtl: m.GetDataMsg().PushTtl,
+								AdvTtl:  m.GetDataMsg().AdvTtl,
+							},
+						},
+					}
+					msg.Respond(resp)
+					return
+				}
 			}
-			// Would this block go into the message store if it was verified?
-			if !gc.blockMsgStore.CheckValid(msg.GetGossipMessage()) {
-				return
-			}
-			if !gc.verifyBlock(m.GossipMessage, msg.GetConnectionInfo().ID) {
-				gc.logger.Warning("Failed verifying block", m.GetDataMsg().Payload.SeqNum)
-				return
-			}
-			added = gc.blockMsgStore.Add(msg.GetGossipMessage())
 		} else { // StateInfoMsg verification should be handled in a layer above
 			//  since we don't have access to the id mapper here
 			added = gc.stateInfoMsgStore.Add(msg.GetGossipMessage())
@@ -622,42 +644,12 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 			if m.GetDataMsg().PushTtl > 0 {
 				m.GetDataMsg().PushTtl -= 1
 				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
-				gc.logger.Criticalf("Forwarding %d", m.GetDataMsg().Payload.SeqNum)
 				gc.Forward(msg)
 			} else if m.GetDataMsg().AdvTtl > 0 {
 				m.GetDataMsg().AdvTtl -= 1
+				m.GetDataMsg().Payload = nil
 				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
-				gc.mapLock.Lock()
-				nonce := gc.newNONCE()
-				gc.nonces[nonce] = m.GossipMessage
-				gc.mapLock.Unlock()
-				time.AfterFunc(time.Duration(1000)*time.Millisecond, func() {
-					gc.mapLock.Lock()
-					delete(gc.nonces, nonce)
-					gc.mapLock.Unlock()
-				})
-
-				msgs := make([]interface{}, 1)
-				msgs[0] = &proto.EmittedGossipMessage{
-					SignedGossipMessage: &proto.SignedGossipMessage{
-						Envelope: nil,
-						GossipMessage: &proto.GossipMessage{
-							Nonce:   0,
-							Tag:     proto.GossipMessage_CHAN_AND_ORG,
-							Channel: m.Channel,
-							Content: &proto.GossipMessage_AdvMsg{
-								AdvMsg: &proto.AdvertiseMessage{
-									Nonce:  nonce,
-									SeqNum: m.GetDataMsg().Payload.SeqNum,
-								},
-							},
-						},
-					},
-					Filter: func(_ common.PKIidType) bool {
-						return true
-					},
-				}
-				gc.cb(msgs)
+				gc.Forward(msg)
 			}
 
 			// Forward the message

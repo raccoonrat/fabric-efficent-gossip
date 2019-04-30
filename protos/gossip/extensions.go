@@ -53,18 +53,6 @@ func (mc *msgComparator) invalidationPolicy(this interface{}, that interface{}) 
 		return mc.identityInvalidationPolicy(thisMsg.GetPeerIdentity(), thatMsg.GetPeerIdentity())
 	}
 
-	if thisMsg.IsAdvertiseMessage() && thatMsg.IsAdvertiseMessage() {
-		return mc.advInvalidationPolicy(thisMsg.GetAdvMsg(), thatMsg.GetAdvMsg())
-	}
-
-	if thisMsg.IsAdvertiseMessage() && thatMsg.IsDataMsg() {
-		return mc.advDataInvalidationPolicy(thisMsg.GetAdvMsg(), thatMsg.GetDataMsg())
-	}
-
-	if thisMsg.IsDataMsg() && thatMsg.IsAdvertiseMessage() {
-		return mc.dataAdvInvalidationPolicy(thisMsg.GetDataMsg(), thatMsg.GetAdvMsg())
-	}
-
 	if thisMsg.IsLeadershipMsg() && thatMsg.IsLeadershipMsg() {
 		return leaderInvalidationPolicy(thisMsg.GetLeadershipMsg(), thatMsg.GetLeadershipMsg())
 	}
@@ -85,56 +73,6 @@ func (mc *msgComparator) identityInvalidationPolicy(thisIdentityMsg *PeerIdentit
 	}
 
 	return common.MessageNoAction
-}
-
-func (mc *msgComparator) advInvalidationPolicy(thisAdvMsg *AdvertiseMessage, thatAdvMsg *AdvertiseMessage) common.InvalidationResult {
-	if thisAdvMsg.SeqNum == thatAdvMsg.SeqNum {
-		return common.MessageInvalidated
-	}
-
-	diff := abs(thisAdvMsg.SeqNum, thatAdvMsg.SeqNum)
-	if diff <= uint64(mc.dataBlockStorageSize) {
-		return common.MessageNoAction
-	}
-
-	if thisAdvMsg.SeqNum > thatAdvMsg.SeqNum {
-		return common.MessageInvalidates
-	}
-	return common.MessageInvalidated
-}
-
-func (mc *msgComparator) dataAdvInvalidationPolicy(thisDataMsg *DataMessage, thatAdvMsg *AdvertiseMessage) common.InvalidationResult {
-	if thisDataMsg.Payload.SeqNum == thatAdvMsg.SeqNum {
-		return common.MessageInvalidates
-	}
-
-	diff := abs(thisDataMsg.Payload.SeqNum, thatAdvMsg.SeqNum)
-	if diff <= uint64(mc.dataBlockStorageSize) {
-		return common.MessageNoAction
-	}
-
-	if thisDataMsg.Payload.SeqNum > thatAdvMsg.SeqNum {
-		return common.MessageInvalidates
-	}
-
-	return common.MessageInvalidated
-}
-
-func (mc *msgComparator) advDataInvalidationPolicy(thisDataMsg *AdvertiseMessage, thatAdvMsg *DataMessage) common.InvalidationResult {
-	if thisDataMsg.SeqNum == thatAdvMsg.Payload.SeqNum {
-		return common.MessageInvalidated
-	}
-
-	diff := abs(thisDataMsg.SeqNum, thatAdvMsg.Payload.SeqNum)
-	if diff <= uint64(mc.dataBlockStorageSize) {
-		return common.MessageNoAction
-	}
-
-	if thisDataMsg.SeqNum > thatAdvMsg.Payload.SeqNum {
-		return common.MessageInvalidates
-	}
-
-	return common.MessageInvalidated
 }
 
 func (mc *msgComparator) dataInvalidationPolicy(thisDataMsg *DataMessage, thatDataMsg *DataMessage) common.InvalidationResult {
@@ -186,10 +124,6 @@ func compareTimestamps(thisTS *PeerTime, thatTS *PeerTime) common.InvalidationRe
 // IsAliveMsg returns whether this GossipMessage is an AliveMessage
 func (m *GossipMessage) IsAliveMsg() bool {
 	return m.GetAliveMsg() != nil
-}
-
-func (m *GossipMessage) IsAdvertiseMessage() bool {
-	return m.GetAdvMsg() != nil
 }
 
 func (m *GossipMessage) IsRequestMessage() bool {
@@ -314,13 +248,6 @@ type IdentifierExtractor func(*SignedGossipMessage) string
 func (m *GossipMessage) IsTagLegal() error {
 	if m.Tag == GossipMessage_UNDEFINED {
 		return fmt.Errorf("Undefined tag")
-	}
-
-	if m.IsAdvertiseMessage() {
-		if m.Tag != GossipMessage_CHAN_AND_ORG {
-			return fmt.Errorf("Tag should be %s", GossipMessage_Tag_name[int32(GossipMessage_CHAN_AND_ORG)])
-		}
-		return nil
 	}
 
 	if m.IsRequestMessage() {

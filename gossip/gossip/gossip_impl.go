@@ -349,11 +349,8 @@ func (g *gossipServiceImpl) handleMessage(m proto.ReceivedMessage) {
 	if msg.IsDataMsg() {
 		g.logger.Criticalf("Received pushed block #%d-%d-%d from %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, m.GetConnectionInfo().ID)
 	}
-	if msg.IsAdvertiseMessage() {
-		g.logger.Criticalf("Received advertise msg #%d %d from %v", msg.GetAdvMsg().SeqNum, msg.GetAdvMsg().Nonce, m.GetConnectionInfo().ID)
-	}
 	if msg.IsRequestMessage() {
-		g.logger.Criticalf("Received request msg %d from %v", msg.GetReqMsg().Nonce, m.GetConnectionInfo().ID)
+		g.logger.Criticalf("Received request msg %d from %v", msg.GetReqMsg().Block, m.GetConnectionInfo().ID)
 	}
 	if msg.IsDataUpdate() && msg.GetPullMsgType() == proto.PullMsgType_BLOCK_MSG {
 		if msg.IsDataUpdate() {
@@ -484,7 +481,6 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*proto.EmittedGossipMessage) {
 		return
 	}
 
-	var advertiseMsgs []*proto.EmittedGossipMessage
 	var blocks []*proto.EmittedGossipMessage
 	var stateInfoMsgs []*proto.EmittedGossipMessage
 	var orgMsgs []*proto.EmittedGossipMessage
@@ -510,18 +506,10 @@ func (g *gossipServiceImpl) gossipBatch(msgs []*proto.EmittedGossipMessage) {
 	isLeadershipMsg := func(o interface{}) bool {
 		return o.(*proto.EmittedGossipMessage).IsLeadershipMsg()
 	}
-	isAdvertise := func(o interface{}) bool {
-		return o.(*proto.EmittedGossipMessage).IsAdvertiseMessage()
-	}
 
 	// Gossip blocks
 	blocks, msgs = partitionMessages(isABlock, msgs)
 	g.gossipInChan(blocks, func(gc channel.GossipChannel) filter.RoutingFilter {
-		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
-	}, g.conf.BlocksPeerNum)
-
-	advertiseMsgs, msgs = partitionMessages(isAdvertise, msgs)
-	g.gossipInChan(advertiseMsgs, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.isInMyorg)
 	}, g.conf.BlocksPeerNum)
 
