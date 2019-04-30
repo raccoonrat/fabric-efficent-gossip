@@ -36,7 +36,7 @@ const (
 	acceptChanSize       = 100
 )
 
-type channelRoutingFilterFactory func(channel.GossipChannel) filter.RoutingFilter
+type ChannelRoutingFilterFactory func(channel.GossipChannel) filter.RoutingFilter
 
 type gossipServiceImpl struct {
 	selfIdentity          api.PeerIdentityType
@@ -580,7 +580,7 @@ func (g *gossipServiceImpl) sendAndFilterSecrets(msg *proto.SignedGossipMessage,
 }
 
 // GossipInChan gossips a given GossipMessage slice according to a channel's routing policy.
-func (g *gossipServiceImpl) GossipInChan(messages []*proto.EmittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory, peers int) {
+func (g *gossipServiceImpl) GossipInChan(messages []*proto.EmittedGossipMessage, chanRoutingFactory ChannelRoutingFilterFactory, peers int) {
 	if len(messages) == 0 {
 		return
 	}

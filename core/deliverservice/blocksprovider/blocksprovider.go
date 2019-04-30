@@ -17,6 +17,7 @@ import (
 	gossipcommon "github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/discovery"
 	"github.com/hyperledger/fabric/gossip/filter"
+	"github.com/hyperledger/fabric/gossip/gossip"
 	"github.com/hyperledger/fabric/gossip/gossip/channel"
 	"github.com/hyperledger/fabric/gossip/util"
 	"github.com/hyperledger/fabric/protos/common"
@@ -33,8 +34,6 @@ type LedgerInfo interface {
 	LedgerHeight() (uint64, error)
 }
 
-type channelRoutingFilterFactory func(channel.GossipChannel) filter.RoutingFilter
-
 // GossipServiceAdapter serves to provide basic functionality
 // required from gossip service by delivery service
 type GossipServiceAdapter interface {
@@ -46,7 +45,7 @@ type GossipServiceAdapter interface {
 
 	// Gossip the message across the peers
 	Gossip(msg *gossip_proto.GossipMessage)
-	GossipInChan(messages []*gossip_proto.EmittedGossipMessage, chanRoutingFactory channelRoutingFilterFactory, peers int)
+	GossipInChan(messages []*gossip_proto.EmittedGossipMessage, chanRoutingFactory gossip.ChannelRoutingFilterFactory, peers int)
 	IsInMyorg(member discovery.NetworkMember) bool
 }
 
