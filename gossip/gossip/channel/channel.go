@@ -616,7 +616,7 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 				added = gc.blockMsgStore.Add(msg.GetGossipMessage())
 			} else {
 				gc.mapLock.Lock()
-				_, ok := gc.blocks[m.GetDataMsg().Payload.SeqNum]
+				_, ok := gc.blocks[m.GetDataMsg().Block]
 				gc.mapLock.Unlock()
 				if !ok {
 					resp := &proto.GossipMessage{
