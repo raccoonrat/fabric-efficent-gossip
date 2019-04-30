@@ -128,6 +128,12 @@ type Adapter interface {
 	GetIdentityByPKIID(pkiID common.PKIidType) api.PeerIdentityType
 }
 
+type blockTtl struct {
+	block   uint64
+	pushttl int32
+	advttl  int32
+}
+
 type gossipChannel struct {
 	Adapter
 	sync.RWMutex
@@ -141,7 +147,9 @@ type gossipChannel struct {
 	joinMsg                   api.JoinChannelMessage
 	cb                        func([]interface{})
 	mapLock                   *sync.Mutex
+	pushLock                  *sync.Mutex
 	blocks                    map[uint64]*proto.Payload
+	pushCache                 map[blockTtl]bool
 	blockMsgStore             msgstore.MessageStore
 	stateInfoMsgStore         *stateInfoCache
 	leaderMsgStore            msgstore.MessageStore
@@ -189,11 +197,13 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 		shouldGossipStateInfo:     int32(0),
 		stateInfoPublishScheduler: time.NewTicker(adapter.GetConf().PublishStateInfoInterval),
 		stateInfoRequestScheduler: time.NewTicker(adapter.GetConf().RequestStateInfoInterval),
-		orgs:    []api.OrgIdentityType{},
-		chainID: chainID,
-		mapLock: &sync.Mutex{},
-		blocks:  make(map[uint64]*proto.Payload),
-		cb:      cb,
+		orgs:      []api.OrgIdentityType{},
+		chainID:   chainID,
+		mapLock:   &sync.Mutex{},
+		pushLock:  &sync.Mutex{},
+		blocks:    make(map[uint64]*proto.Payload),
+		pushCache: make(map[blockTtl]bool),
+		cb:        cb,
 	}
 
 	gc.memFilter = &membershipFilter{adapter: gc.Adapter, gossipChannel: gc}
@@ -658,15 +668,27 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 		}
 
 		if m.IsDataMsg() {
-			if m.GetDataMsg().PushTtl > 0 {
-				m.GetDataMsg().PushTtl -= 1
-				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
-				gc.Forward(msg)
-			} else if m.GetDataMsg().AdvTtl > 0 {
-				m.GetDataMsg().AdvTtl -= 1
-				m.GetDataMsg().Payload = nil
-				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
-				gc.Forward(msg)
+			var ttl blockTtl
+			ttl.block = m.GetDataMsg().Block
+			ttl.pushttl = m.GetDataMsg().PushTtl
+			ttl.advttl = m.GetDataMsg().AdvTtl
+
+			gc.pushLock.Lock()
+			if _, ok := gc.pushCache[ttl]; !ok {
+				gc.pushCache[ttl] = true
+				gc.pushLock.Unlock()
+				if m.GetDataMsg().PushTtl > 0 {
+					m.GetDataMsg().PushTtl -= 1
+					m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
+					gc.Forward(msg)
+				} else if m.GetDataMsg().AdvTtl > 0 {
+					m.GetDataMsg().AdvTtl -= 1
+					m.GetDataMsg().Payload = nil
+					m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
+					gc.Forward(msg)
+				}
+			} else {
+				gc.pushLock.Unlock()
 			}
 
 			// Forward the message
