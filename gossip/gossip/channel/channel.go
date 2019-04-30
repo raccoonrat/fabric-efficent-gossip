@@ -641,12 +641,30 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 		}
 
 		if m.IsDataMsg() {
+			var m_cpy *proto.SignedGossipMessage
+
+			m_cpy = m
 			if m.GetDataMsg().PushTtl > 0 {
 				m.GetDataMsg().PushTtl -= 1
 				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
 				gc.Forward(msg)
 			} else if m.GetDataMsg().AdvTtl > 0 {
 				m.GetDataMsg().AdvTtl -= 1
+				m_cpy = &proto.SignedGossipMessage{
+					Envelope: nil,
+					GossipMessage: &proto.GossipMessage{
+						Tag:     m.Tag,
+						Channel: m.Channel,
+						Content: &proto.GossipMessage_DataMsg{
+							DataMsg: &proto.DataMessage{
+								Block:   m.GetDataMsg().Block,
+								PushTtl: m.GetDataMsg().PushTtl,
+								AdvTtl:  m.GetDataMsg().AdvTtl,
+								Payload: m.GetDataMsg().Payload,
+							},
+						},
+					},
+				}
 				m.GetDataMsg().Payload = nil
 				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
 				gc.Forward(msg)
@@ -655,9 +673,9 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 			// Forward the message
 			if added {
 				// DeMultiplex to local subscribers
-				gc.DeMultiplex(m)
+				gc.DeMultiplex(m_cpy)
 
-				gc.blocksPuller.Add(msg.GetGossipMessage())
+				gc.blocksPuller.Add(m_cpy)
 			}
 		}
 
