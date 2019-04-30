@@ -54,6 +54,7 @@ type Gossip interface {
 
 	// Gossip sends a message to other peers to the network
 	Gossip(msg *proto.GossipMessage)
+	GossipBlock(msg *proto.GossipMessage)
 	GossipInChan(messages []*proto.EmittedGossipMessage, chanRoutingFactory ChannelRoutingFilterFactory, peers int)
 	IsInMyorg(member discovery.NetworkMember) bool
 

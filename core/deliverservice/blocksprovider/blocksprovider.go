@@ -16,9 +16,7 @@ import (
 	"github.com/hyperledger/fabric/gossip/api"
 	gossipcommon "github.com/hyperledger/fabric/gossip/common"
 	"github.com/hyperledger/fabric/gossip/discovery"
-	"github.com/hyperledger/fabric/gossip/filter"
 	"github.com/hyperledger/fabric/gossip/gossip"
-	"github.com/hyperledger/fabric/gossip/gossip/channel"
 	"github.com/hyperledger/fabric/gossip/util"
 	"github.com/hyperledger/fabric/protos/common"
 	gossip_proto "github.com/hyperledger/fabric/protos/gossip"
@@ -45,6 +43,7 @@ type GossipServiceAdapter interface {
 
 	// Gossip the message across the peers
 	Gossip(msg *gossip_proto.GossipMessage)
+	GossipBlock(msg *gossip_proto.GossipMessage)
 	GossipInChan(messages []*gossip_proto.EmittedGossipMessage, chanRoutingFactory gossip.ChannelRoutingFilterFactory, peers int)
 	IsInMyorg(member discovery.NetworkMember) bool
 }
@@ -198,19 +197,7 @@ func (b *blocksProviderImpl) DeliverBlocks() {
 			// Gossip messages with other nodes
 			logger.Criticalf("[%s] Gossiping block [%d] of size [%d], peers number [%d]", b.chainID, blockNum, len(gossipMsg.GetDataMsg().Payload.Data), numberOfPeers)
 			if !b.isDone() {
-				msgs := make([]*gossip_proto.EmittedGossipMessage, 1)
-				msgs[0] = &gossip_proto.EmittedGossipMessage{
-					SignedGossipMessage: &gossip_proto.SignedGossipMessage{
-						GossipMessage: gossipMsg,
-					},
-					Filter: func(_ gossipcommon.PKIidType) bool {
-						return true
-					},
-				}
-				msgs[0].SignedGossipMessage, err = msgs[0].NoopSign()
-				b.gossip.GossipInChan(msgs, func(gc channel.GossipChannel) filter.RoutingFilter {
-					return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, b.gossip.IsInMyorg)
-				}, 1)
+				b.gossip.GossipBlock(gossipMsg)
 			}
 		default:
 			logger.Warningf("[%s] Received unknown: ", b.chainID, t)

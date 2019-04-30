@@ -218,18 +218,22 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 	gc.blockMsgStore = msgstore.NewMessageStoreExpirable(comparator, func(m interface{}) {
 		if m.(*proto.SignedGossipMessage).IsDataMsg() {
 			gc.blocksPuller.Remove(seqNumFromMsg(m))
+			gc.mapLock.Lock()
 			if _, ok := gc.blocks[m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum]; ok {
-				gc.mapLock.Lock()
 				delete(gc.blocks, m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum)
+				gc.mapLock.Unlock()
+			} else {
 				gc.mapLock.Unlock()
 			}
 		}
 	}, gc.GetConf().BlockExpirationInterval, nil, nil, func(m interface{}) {
 		if m.(*proto.SignedGossipMessage).IsDataMsg() {
 			gc.blocksPuller.Remove(seqNumFromMsg(m))
+			gc.mapLock.Lock()
 			if _, ok := gc.blocks[m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum]; ok {
-				gc.mapLock.Lock()
 				delete(gc.blocks, m.(*proto.SignedGossipMessage).GetDataMsg().Payload.SeqNum)
+				gc.mapLock.Unlock()
+			} else {
 				gc.mapLock.Unlock()
 			}
 		}
@@ -515,6 +519,11 @@ func (gc *gossipChannel) AddToMsgStore(msg *proto.SignedGossipMessage) {
 	if msg.IsDataMsg() {
 		gc.blockMsgStore.Add(msg)
 		gc.blocksPuller.Add(msg)
+		gc.mapLock.Lock()
+		if _, ok := gc.blocks[msg.GetDataMsg().Block]; !ok {
+			gc.blocks[msg.GetDataMsg().Block] = msg.GetDataMsg().Payload
+		}
+		gc.mapLock.Unlock()
 	}
 
 	if msg.IsStateInfoMsg() {

@@ -729,6 +729,54 @@ func (g *gossipServiceImpl) Gossip(msg *proto.GossipMessage) {
 	})
 }
 
+func (g *gossipServiceImpl) GossipBlock(msg *proto.GossipMessage) {
+	// Educate developers to Gossip messages with the right tags.
+	// See IsTagLegal() for wanted behavior.
+	if err := msg.IsTagLegal(); err != nil {
+		panic(errors.WithStack(err))
+	}
+
+	sMsg := &proto.SignedGossipMessage{
+		GossipMessage: msg,
+	}
+
+	var err error
+	if sMsg.IsDataMsg() {
+		sMsg, err = sMsg.NoopSign()
+	} else {
+		_, err = sMsg.Sign(func(msg []byte) ([]byte, error) {
+			return g.mcs.Sign(msg)
+		})
+	}
+
+	if err != nil {
+		g.logger.Warningf("Failed signing message: %+v", errors.WithStack(err))
+		return
+	}
+
+	if msg.IsChannelRestricted() {
+		gc := g.chanState.getGossipChannelByChainID(msg.Channel)
+		if gc == nil {
+			g.logger.Warning("Failed obtaining gossipChannel of", msg.Channel, "aborting")
+			return
+		}
+		if msg.IsDataMsg() {
+			gc.AddToMsgStore(sMsg)
+		}
+	}
+
+	msgs := make([]*proto.EmittedGossipMessage, 1)
+	msgs[0] = &proto.EmittedGossipMessage{
+		SignedGossipMessage: sMsg,
+		Filter: func(_ common.PKIidType) bool {
+			return true
+		},
+	}
+	g.GossipInChan(msgs, func(gc channel.GossipChannel) filter.RoutingFilter {
+		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.IsInMyorg)
+	}, 1)
+}
+
 // Send sends a message to remote peers
 func (g *gossipServiceImpl) Send(msg *proto.GossipMessage, peers ...*comm.RemotePeer) {
 	m, err := msg.NoopSign()
