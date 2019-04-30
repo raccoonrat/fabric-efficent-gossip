@@ -258,7 +258,7 @@ func (conn *connection) send(msg *proto.SignedGossipMessage, onErr func(error), 
 	}
 
 	if msg.IsDataMsg() {
-		conn.logger.Criticalf("Sending pushed block #%d-%d-%d to %v", msg.GetDataMsg().Payload.SeqNum, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, conn.pkiID)
+		conn.logger.Criticalf("Sending pushed block #%d-%d-%d to %v", msg.GetDataMsg().Block, msg.GetDataMsg().PushTtl, msg.GetDataMsg().AdvTtl, conn.pkiID)
 	}
 	if msg.IsRequestMessage() {
 		conn.logger.Criticalf("Sending request msg %d to %v", msg.GetReqMsg().Block, conn.pkiID)
