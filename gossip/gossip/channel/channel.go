@@ -622,6 +622,7 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 			if m.GetDataMsg().PushTtl > 0 {
 				m.GetDataMsg().PushTtl -= 1
 				m.Sign(func(msg []byte) ([]byte, error) { return nil, nil })
+				gc.logger.Criticalf("Forwarding %d", m.GetDataMsg().Payload.SeqNum)
 				gc.Forward(msg)
 			} else if m.GetDataMsg().AdvTtl > 0 {
 				m.GetDataMsg().AdvTtl -= 1
