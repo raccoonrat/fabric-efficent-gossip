@@ -774,7 +774,7 @@ func (g *gossipServiceImpl) GossipBlock(msg *proto.GossipMessage) {
 	}
 	g.GossipInChan(msgs, func(gc channel.GossipChannel) filter.RoutingFilter {
 		return filter.CombineRoutingFilters(gc.EligibleForChannel, gc.IsMemberInChan, g.IsInMyorg)
-	}, 1)
+	}, 4)
 }
 
 // Send sends a message to remote peers
