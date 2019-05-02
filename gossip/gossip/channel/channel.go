@@ -149,6 +149,7 @@ type gossipChannel struct {
 	mapLock                   *sync.Mutex
 	pushLock                  *sync.Mutex
 	blocks                    map[uint64]*proto.Payload
+	requests                  map[uint64][]*proto.ReceivedMessage
 	pushCache                 map[blockTtl]bool
 	blockMsgStore             msgstore.MessageStore
 	stateInfoMsgStore         *stateInfoCache
@@ -202,6 +203,7 @@ func NewGossipChannel(pkiID common.PKIidType, org api.OrgIdentityType, mcs api.M
 		mapLock:   &sync.Mutex{},
 		pushLock:  &sync.Mutex{},
 		blocks:    make(map[uint64]*proto.Payload),
+		requests:  make(map[uint64][]*proto.ReceivedMessage),
 		pushCache: make(map[blockTtl]bool),
 		cb:        cb,
 	}
@@ -591,22 +593,34 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 	if m.IsRequestMessage() {
 		gc.mapLock.Lock()
 		respPayload, ok := gc.blocks[m.GetReqMsg().Block]
-		gc.mapLock.Unlock()
 		if ok {
-			resp := &proto.GossipMessage{
-				Nonce:   0,
-				Tag:     proto.GossipMessage_CHAN_AND_ORG,
-				Channel: m.Channel,
-				Content: &proto.GossipMessage_DataMsg{
-					DataMsg: &proto.DataMessage{
-						Block:   m.GetReqMsg().Block,
-						PushTtl: m.GetReqMsg().PushTtl,
-						AdvTtl:  m.GetReqMsg().AdvTtl,
-						Payload: respPayload,
+			if respPayload == nil {
+				req_list, ok := gc.requests[m.GetReqMsg().Block]
+				if !ok {
+					req_list = make([]*proto.ReceivedMessage, 1)
+					req_list[0] = &msg
+				} else {
+					req_list = append(req_list, &msg)
+				}
+				gc.requests[m.GetReqMsg().Block] = req_list
+				gc.mapLock.Unlock()
+			} else {
+				gc.mapLock.Unlock()
+				resp := &proto.GossipMessage{
+					Nonce:   0,
+					Tag:     proto.GossipMessage_CHAN_AND_ORG,
+					Channel: m.Channel,
+					Content: &proto.GossipMessage_DataMsg{
+						DataMsg: &proto.DataMessage{
+							Block:   m.GetReqMsg().Block,
+							PushTtl: m.GetReqMsg().PushTtl,
+							AdvTtl:  m.GetReqMsg().AdvTtl,
+							Payload: respPayload,
+						},
 					},
-				},
+				}
+				msg.Respond(resp)
 			}
-			msg.Respond(resp)
 		}
 	}
 
@@ -632,11 +646,41 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 			}
 
 			if m.GetDataMsg().Payload != nil {
+				var req_list []*proto.ReceivedMessage
+				var resp_list []*proto.GossipMessage
+				var hasBlocks bool = false
+
 				gc.mapLock.Lock()
 				if payload, ok := gc.blocks[m.GetDataMsg().Payload.SeqNum]; !ok || payload == nil {
 					gc.blocks[m.GetDataMsg().Block] = m.GetDataMsg().Payload
+					req_list, ok = gc.requests[m.GetDataMsg().Block]
+					if ok {
+						hasBlocks = true
+						resp_list = make([]*proto.GossipMessage, len(req_list))
+						for i := 0; i < len(req_list); i += 1 {
+							resp_list[i] = &proto.GossipMessage{
+								Nonce:   0,
+								Tag:     proto.GossipMessage_CHAN_AND_ORG,
+								Channel: m.Channel,
+								Content: &proto.GossipMessage_DataMsg{
+									DataMsg: &proto.DataMessage{
+										Block:   m.GetReqMsg().Block,
+										PushTtl: m.GetReqMsg().PushTtl,
+										AdvTtl:  m.GetReqMsg().AdvTtl,
+										Payload: m.GetDataMsg().Payload,
+									},
+								},
+							}
+						}
+						delete(gc.requests, m.GetDataMsg().Block)
+					}
 				}
 				gc.mapLock.Unlock()
+				if hasBlocks {
+					for i := 0; i < len(req_list); i += 1 {
+						(*req_list[i]).Respond(resp_list[i])
+					}
+				}
 				if m.GetDataMsg().Payload == nil {
 					gc.logger.Warning("Payload is empty, got it from", msg.GetConnectionInfo().ID)
 					return
@@ -653,9 +697,7 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 			} else {
 				gc.mapLock.Lock()
 				_, ok := gc.blocks[m.GetDataMsg().Block]
-				gc.mapLock.Unlock()
 				if !ok {
-					gc.mapLock.Lock()
 					gc.blocks[m.GetDataMsg().Block] = nil
 					gc.mapLock.Unlock()
 					resp := &proto.GossipMessage{
@@ -672,6 +714,8 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 					}
 					msg.Respond(resp)
 					return
+				} else {
+					gc.mapLock.Unlock()
 				}
 			}
 		} else { // StateInfoMsg verification should be handled in a layer above
