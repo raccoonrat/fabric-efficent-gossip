@@ -664,9 +664,9 @@ func (gc *gossipChannel) HandleMessage(msg proto.ReceivedMessage) {
 								Channel: m.Channel,
 								Content: &proto.GossipMessage_DataMsg{
 									DataMsg: &proto.DataMessage{
-										Block:   m.GetReqMsg().Block,
-										PushTtl: m.GetReqMsg().PushTtl,
-										AdvTtl:  m.GetReqMsg().AdvTtl,
+										Block:   (*req_list[i]).GetGossipMessage().GetReqMsg().Block,
+										PushTtl: (*req_list[i]).GetGossipMessage().GetReqMsg().PushTtl,
+										AdvTtl:  (*req_list[i]).GetGossipMessage().GetReqMsg().AdvTtl,
 										Payload: m.GetDataMsg().Payload,
 									},
 								},
