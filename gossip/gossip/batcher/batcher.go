@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/hyperledger/fabric/protos/gossip"
 	"github.com/pkg/errors"
 )
 
@@ -131,7 +132,13 @@ func (p *batchingEmitterImpl) Add(message interface{}) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.buff = append(p.buff, &batchedMessage{data: message, iterationsLeft: p.iterations})
+	if message.(*gossip.EmittedGossipMessage).IsDataMsg() {
+		msgs2beEmitted := make([]interface{}, 1)
+		msgs2beEmitted[0] = message
+		p.cb(msgs2beEmitted)
+	} else {
+		p.buff = append(p.buff, &batchedMessage{data: message, iterationsLeft: p.iterations})
+	}
 
 	if len(p.buff) >= p.burstSize {
 		p.emit()
