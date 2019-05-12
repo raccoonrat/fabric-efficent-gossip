@@ -164,7 +164,7 @@ peer:
         blockPeerNum: 4
         propagatePeerNum: 3
         pushTtl: 2
-        advTtl: 7
+        advTtl: 4
         # Determines frequency of pull phases(unit: second)
         # Must be greater than digestWaitTime + responseWaitTime
         pullInterval: 4s
