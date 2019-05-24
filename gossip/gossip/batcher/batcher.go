@@ -130,7 +130,6 @@ func (p *batchingEmitterImpl) Add(message interface{}) {
 		return
 	}
 	p.lock.Lock()
-	defer p.lock.Unlock()
 
 	if message.(*gossip.EmittedGossipMessage).IsDataMsg() {
 		msgs2beEmitted := make([]interface{}, 1)
@@ -138,9 +137,12 @@ func (p *batchingEmitterImpl) Add(message interface{}) {
 		p.cb(msgs2beEmitted)
 	} else {
 		p.buff = append(p.buff, &batchedMessage{data: message, iterationsLeft: p.iterations})
+		p.lock.Unlock()
+		return
 	}
 
 	if len(p.buff) >= p.burstSize {
 		p.emit()
 	}
+	p.lock.Unlock()
 }
